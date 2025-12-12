@@ -3,25 +3,23 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "{{PROJECT_NAME}}"
+name = "ds-protocol-http-py-lib"
 dynamic = ["version"]
 description = "A Python package from the ds-common library collection"
 dependencies = []
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE-APACHE"]
 keywords = ["ds", "common", "python"]
 authors = [
-    {name = "{{AUTHOR_NAME}}", email = "{{AUTHOR_EMAIL}}"}
+    {name = "Kristoffer Varslott", email = "hello@grasplabs.com"}
 ]
 maintainers = [
-    {name = "{{AUTHOR_NAME}}", email = "{{AUTHOR_EMAIL}}"}
+    {name = "Kristoffer Varslott", email = "hello@grasplabs.com"}
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Operating System :: OS Independent",
@@ -32,10 +30,10 @@ classifiers = [
 readme = "PyPI.md"
 
 [project.urls]
-Documentation = "https://grasp-labs.github.io/{{GITHUB_REPO}}/"
-Repository = "https://github.com/grasp-labs/{{GITHUB_REPO}}/"
-Issues = "https://github.com/grasp-labs/{{GITHUB_REPO}}/issues/"
-Changelog = "https://github.com/grasp-labs/{{GITHUB_REPO}}/releases"
+Documentation = "https://grasp-labs.github.io/ds-protocol-http-py-lib/"
+Repository = "https://github.com/grasp-labs/ds-protocol-http-py-lib/"
+Issues = "https://github.com/grasp-labs/ds-protocol-http-py-lib/issues/"
+Changelog = "https://github.com/grasp-labs/ds-protocol-http-py-lib/releases"
 
 [project.optional-dependencies]
 dev = [
@@ -66,7 +64,7 @@ docs = [
 include-package-data = true
 
 [tool.setuptools.package-data]
-{{PYTHON_MODULE_NAME}} = ["py.typed"]
+ds_protocol_http_py_lib = ["py.typed"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION.txt"}

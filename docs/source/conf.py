@@ -28,9 +28,9 @@ autoapi_dirs = ["../../src"]
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "{{PROJECT_NAME}}"
+project = "ds-protocol-http-py-lib"
 copyright = "2025, Aider AS"
-author = "{{AUTHOR_NAME}}"
+author = "Kristoffer Varslott"
 
 version = open("../../VERSION.txt").read().strip()
 release = version

@@ -1,12 +1,12 @@
-# {{PROJECT_NAME}}
+# ds-protocol-http-py-lib
 
-![Python Versions](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)
-[![PyPI version](https://badge.fury.io/py/{{PROJECT_NAME}}.svg?kill_cache=1)](https://badge.fury.io/py/{{PROJECT_NAME}})
-[![Build Status](https://github.com/grasp-labs/{{GITHUB_REPO}}/actions/workflows/build.yaml/badge.svg)](https://github.com/grasp-labs/{{GITHUB_REPO}}/actions/workflows/build.yaml)
-[![codecov](https://codecov.io/gh/grasp-labs/{{GITHUB_REPO}}/graph/badge.svg?token=EO3YCNCZFS)](https://codecov.io/gh/grasp-labs/{{GITHUB_REPO}})
+![Python Versions](https://img.shields.io/badge/python-3.11%20|%203.12-blue)
+[![PyPI version](https://badge.fury.io/py/ds-protocol-http-py-lib.svg?kill_cache=1)](https://badge.fury.io/py/ds-protocol-http-py-lib)
+[![Build Status](https://github.com/grasp-labs/ds-protocol-http-py-lib/actions/workflows/build.yaml/badge.svg)](https://github.com/grasp-labs/ds-protocol-http-py-lib/actions/workflows/build.yaml)
+[![codecov](https://codecov.io/gh/grasp-labs/ds-protocol-http-py-lib/graph/badge.svg?token=EO3YCNCZFS)](https://codecov.io/gh/grasp-labs/ds-protocol-http-py-lib)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-DS package for {{PROJECT_NAME}}
+DS package for ds-protocol-http-py-lib
 
 ## Quick Start
 
