@@ -14,6 +14,10 @@ from ds_resource_plugin_py_lib.common.serde.deserialize import (
     DataDeserializer,
     PandasDeserializer,
 )
+from ds_resource_plugin_py_lib.common.serde.serialize import (
+    DataSerializer,
+    PandasSerializer,
+)
 
 from ..enums import ResourceKind
 from ..linked_service.http import HttpLinkedService
@@ -50,6 +54,9 @@ class HttpDataset(
     linked_service: HttpLinkedServiceType
     typed_properties: HttpDatasetTypedPropertiesType
 
+    serializer: DataSerializer | None = field(
+        default_factory=lambda: PandasSerializer(format=DatasetStorageFormatType.JSON),
+    )
     deserializer: DataDeserializer | None = field(
         default_factory=lambda: PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
@@ -72,7 +79,7 @@ class HttpDataset(
         """
         if self.connection is None:
             raise ConnectionException(
-                message="Connection is not initialized. Linked service must be injected first.",
+                message="Connection is not initialized.",
                 code="NOT_INITIALIZED",
                 status_code=503,
             )
@@ -107,7 +114,7 @@ class HttpDataset(
         """
         if self.connection is None:
             raise ConnectionException(
-                message="Connection is not initialized. Linked service must be injected first.",
+                message="Connection is not initialized.",
                 code="NOT_INITIALIZED",
                 status_code=503,
             )
