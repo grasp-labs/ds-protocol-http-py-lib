@@ -1,6 +1,6 @@
-from .rest import RestLinkedService, RestLinkedServiceTypedProperties
+from .http import HttpLinkedService, HttpLinkedServiceTypedProperties
 
 __all__ = [
-    "RestLinkedService",
-    "RestLinkedServiceTypedProperties",
+    "HttpLinkedService",
+    "HttpLinkedServiceTypedProperties",
 ]

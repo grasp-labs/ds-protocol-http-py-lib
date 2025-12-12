@@ -6,7 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "ds-protocol-http-py-lib"
 dynamic = ["version"]
 description = "A Python package from the ds-protocol library collection"
-dependencies = []
+dependencies = [
+    "ds-resource-plugin-py-lib>=0.1.0a1, <1.0.0",
+]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE-APACHE"]
@@ -39,6 +41,7 @@ Changelog = "https://github.com/grasp-labs/ds-protocol-http-py-lib/releases"
 dev = [
     "ruff>=0.1.8",
     "mypy>=1.7.0",
+    "pandas-stubs>=2.1.0",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",

@@ -29,13 +29,13 @@ repos:
         entry: uv run ruff format
         args: [--config, .config/ruff.toml]
         files: ^(src|tests)/.*\.py$
-      # - id: mypy
-      #   name: mypy
-      #   language: system
-      #   entry: uv run mypy
-      #   args: [--config-file, .config/mypy.ini, src]
-      #   pass_filenames: false
-      #   files: ^src/
+      - id: mypy
+        name: mypy
+        language: system
+        entry: uv run mypy
+        args: [--config-file, .config/mypy.ini, src]
+        pass_filenames: false
+        files: ^src/
       - id: bandit
         name: bandit
         language: system
