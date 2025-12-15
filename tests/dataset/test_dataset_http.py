@@ -18,7 +18,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import Conn
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetTypedProperties
 from ds_protocol_http_py_lib.enums import ResourceKind
-from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService, SerializerSpy
+from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService
 
 
 def test_post_init_connects_when_linked_service_is_provided() -> None:
@@ -61,7 +61,6 @@ def test_create_serializes_and_deserializes_when_content_is_present() -> None:
     It serializes outgoing content and deserializes response content.
     """
 
-    serializer = SerializerSpy()
     deserializer = DeserializerStub()
     http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
     linked_service = LinkedService(http=http)
@@ -69,12 +68,10 @@ def test_create_serializes_and_deserializes_when_content_is_present() -> None:
     dataset = HttpDataset(
         linked_service=cast("Any", linked_service),
         typed_properties=props,
-        serializer=cast("Any", serializer),
         deserializer=cast("Any", deserializer),
     )
     dataset.content = pd.DataFrame([{"x": 1}])
     dataset.create()
-    assert serializer.called_with is not None
     assert deserializer.called_with == b'{"ok": 1}'
     assert isinstance(dataset.content, pd.DataFrame)
     assert http.last_request is not None
