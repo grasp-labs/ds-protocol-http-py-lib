@@ -1,4 +1,4 @@
-# sync_http_client.py
+# provider.py
 import logging
 import time
 from dataclasses import dataclass
