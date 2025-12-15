@@ -84,9 +84,6 @@ class HttpDataset(
                 status_code=503,
             )
 
-        if self.serializer:
-            self.data = self.serializer(self.content)
-
         self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
 
         response = self.connection.request(
