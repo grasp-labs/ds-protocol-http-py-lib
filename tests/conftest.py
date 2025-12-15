@@ -57,6 +57,7 @@ def fake_clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
 
     def _sleep(seconds: float) -> None:
         state["slept"].append(float(seconds))
+        state["now"] = float(state["now"]) + float(seconds)
 
     monkeypatch.setattr(time, "perf_counter", _perf_counter)
     monkeypatch.setattr(time, "sleep", _sleep)

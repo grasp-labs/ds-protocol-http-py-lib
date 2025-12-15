@@ -1,3 +1,4 @@
+import base64
 from dataclasses import dataclass, field
 from typing import Generic, Literal, TypeVar
 
@@ -218,6 +219,120 @@ class HttpLinkedService(
 
         return token
 
+    def _configure_bearer_auth(self, http: Http) -> None:
+        """
+        Configure Bearer authentication.
+
+        Fetches a user token via `_fetch_user_token` and sets the session's
+        Authorization header.
+
+        Args:
+            http: The Http client instance to configure.
+        """
+        user_access_token = self._fetch_user_token(http)
+        http.session.headers.update({"Authorization": f"Bearer {user_access_token}"})
+
+    def _configure_oauth2_auth(self, http: Http) -> None:
+        """
+        Configure OAuth2 (client credentials) authentication.
+
+        Fetches an OAuth2 token via `_fetch_oauth2_token` and sets the session's
+        Authorization header.
+
+        Args:
+            http: The Http client instance to configure.
+        """
+        oauth2_access_token = self._fetch_oauth2_token(http)
+        http.session.headers.update({"Authorization": f"Bearer {oauth2_access_token}"})
+
+    def _configure_basic_auth(self, http: Http) -> None:
+        """
+        Configure HTTP Basic authentication.
+
+        Uses `username_key_value` and `password_key_value` to construct a
+        base64-encoded `username:password` token and sets the session's
+        Authorization header.
+
+        Args:
+            http: The Http client instance to configure.
+
+        Raises:
+            ValueError: If username or password is missing.
+        """
+        username = self.typed_properties.username_key_value
+        password = self.typed_properties.password_key_value
+        if not username:
+            raise ValueError("Basic auth username is missing in the linked service")
+        if not password:
+            raise ValueError("Basic auth password is missing in the linked service")
+        token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
+        http.session.headers.update({"Authorization": f"Basic {token}"})
+
+    def _configure_apikey_auth(self, http: Http) -> None:
+        """
+        Configure API key authentication.
+
+        Updates the session headers with the configured API key name/value.
+
+        Args:
+            http: The Http client instance to configure.
+
+        Raises:
+            ValueError: If API key name or value is missing.
+        """
+        if not self.typed_properties.api_key_name:
+            raise ValueError("API key name is missing in the linked service")
+        if not self.typed_properties.api_key_value:
+            raise ValueError("API key value is missing in the linked service")
+        http.session.headers.update({self.typed_properties.api_key_name: self.typed_properties.api_key_value})
+
+    def _configure_custom_auth(self, http: Http) -> None:
+        """
+        Configure custom authentication.
+
+        Calls the configured token endpoint and extracts an access token from the
+        JSON response using common token key names. The resulting token is stored
+        in the session Authorization header.
+
+        Args:
+            http: The Http client instance to configure.
+
+        Raises:
+            ValueError: If token endpoint is missing or the token cannot be found.
+        """
+        if not self.typed_properties.token_endpoint:
+            raise ValueError("Token endpoint is missing in the linked service properties")
+        response = http.post(
+            url=self.typed_properties.token_endpoint,
+            headers=self.typed_properties.headers,
+            json=self.typed_properties.data,
+            timeout=30,
+        )
+
+        access_token = find_keys_in_json(
+            response.json(),
+            {
+                "access_token",
+                "accessToken",
+                "token",
+            },
+        )
+        if not access_token:
+            raise ValueError("Access token is missing in the response from the token endpoint")
+        http.session.headers.update({"Authorization": f"Bearer {access_token}"})
+
+    def _configure_noauth(self, _http: Http) -> None:
+        """
+        Configure no authentication.
+
+        This is a no-op handler used to keep the auth dispatch table fully typed.
+
+        Args:
+            _http: The Http client instance to configure.
+        """
+
+        return
+
     def connect(self) -> Http:
         """
         Connect to the REST API and configure authentication.
@@ -231,41 +346,19 @@ class HttpLinkedService(
         if self._auth_configured:
             return self._http
 
-        if self.typed_properties.auth_type == "Bearer":
-            user_access_token = self._fetch_user_token(self._http)
-            self._http.session.headers.update({"Authorization": f"Bearer {user_access_token}"})
-        elif self.typed_properties.auth_type == "OAuth2":
-            oauth2_access_token = self._fetch_oauth2_token(self._http)
-            self._http.session.headers.update({"Authorization": f"Bearer {oauth2_access_token}"})
-        elif self.typed_properties.auth_type == "APIKey":
-            if not self.typed_properties.api_key_name:
-                raise ValueError("API key name is missing in the linked service")
-            if not self.typed_properties.api_key_value:
-                raise ValueError("API key value is missing in the linked service")
-            self._http.session.headers.update({self.typed_properties.api_key_name: self.typed_properties.api_key_value})
-        elif self.typed_properties.auth_type == "Custom":
-            if not self.typed_properties.token_endpoint:
-                raise ValueError("Token endpoint is missing in the linked service properties")
-            response = self._http.post(
-                url=self.typed_properties.token_endpoint,
-                headers=self.typed_properties.headers,
-                json=self.typed_properties.data,
-                timeout=30,
-            )
+        handlers = {
+            "Bearer": self._configure_bearer_auth,
+            "OAuth2": self._configure_oauth2_auth,
+            "Basic": self._configure_basic_auth,
+            "APIKey": self._configure_apikey_auth,
+            "Custom": self._configure_custom_auth,
+            "NoAuth": self._configure_noauth,
+        }
 
-            access_token = find_keys_in_json(
-                response.json(),
-                {
-                    "access_token",
-                    "accessToken",
-                    "token",
-                },
-            )
-            if not access_token:
-                raise ValueError("Access token is missing in the response from the token endpoint")
-            self._http.session.headers.update({"Authorization": f"Bearer {access_token}"})
-        elif self.typed_properties.auth_type == "NoAuth":
-            pass
+        try:
+            handlers[self.typed_properties.auth_type](self._http)
+        except KeyError as exc:
+            raise ValueError(f"Unsupported auth_type: {self.typed_properties.auth_type}") from exc
 
         if self.typed_properties.headers:
             self._http.session.headers.update(self.typed_properties.headers)

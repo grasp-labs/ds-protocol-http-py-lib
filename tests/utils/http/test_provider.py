@@ -48,6 +48,8 @@ def test_http_request_acquires_bucket_token_and_returns_response() -> None:
     response = http.request("GET", url)
     assert bucket.called == 1
     assert response.status_code == 200
+    assert session.last is not None
+    assert session.last[2]["timeout"] == 1
 
 
 def test_http_request_raises_http_error_on_failure_status() -> None:
@@ -65,6 +67,25 @@ def test_http_request_raises_http_error_on_failure_status() -> None:
     )
     with pytest.raises(requests.HTTPError):
         http.request("GET", url)
+    assert session.last is not None
+    assert session.last[2]["timeout"] == 1
+
+
+def test_http_request_preserves_explicit_timeout() -> None:
+    """
+    It forwards an explicit timeout to the underlying session request.
+    """
+
+    url = "https://example.test/ok"
+    session = ProviderSession(response=ProviderResponse(status_code=200, headers={}))
+    http = Http(
+        config=HttpConfig(timeout_seconds=1),
+        bucket=cast("Any", TrackingBucket()),
+        session=cast("requests.Session", session),
+    )
+    http.request("GET", url, timeout=5)
+    assert session.last is not None
+    assert session.last[2]["timeout"] == 5
 
 
 def test_http_convenience_methods_delegate_to_request() -> None:

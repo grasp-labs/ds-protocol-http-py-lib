@@ -36,6 +36,7 @@ def test_token_bucket_acquire_sleeps_when_depleted(fake_clock) -> None:
     bucket.last = 0.0
     bucket.acquire()
     assert fake_clock.slept == [0.1]
+    assert bucket.tokens == 0.0
 
 
 def test_token_bucket_capacity_falls_back_when_zero_capacity_provided(fake_clock) -> None:

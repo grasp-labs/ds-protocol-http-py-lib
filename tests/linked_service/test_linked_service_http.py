@@ -4,12 +4,13 @@ HttpLinkedService behavior tests.
 Covers:
 - Base URI construction rules (schema/host/port handling).
 - Token fetch flows (Bearer and OAuth2), including error handling and token extraction.
-- connect() authentication branches (NoAuth/APIKey/Bearer/OAuth2/Custom) and header updates.
+- connect() authentication branches (NoAuth/APIKey/Basic/Bearer/OAuth2/Custom) and header updates.
 - test_connection() success/failure signaling.
 """
 
 from __future__ import annotations
 
+import base64
 from typing import Any, cast
 
 import pytest
@@ -201,6 +202,51 @@ def test_connect_apikey_requires_name_and_value() -> None:
     service_missing_value = HttpLinkedService(typed_properties=props_missing_value)
     with pytest.raises(ValueError):
         service_missing_value.connect()
+
+
+def test_connect_basic_sets_authorization_header() -> None:
+    """
+    It sets an HTTP Basic Authorization header from configured username/password.
+    """
+
+    props = HttpLinkedServiceTypedProperties(
+        host="api.example.test",
+        auth_type="Basic",
+        username_key_value="u",
+        password_key_value="p",
+    )
+    service = HttpLinkedService(typed_properties=props)
+    http = service.connect()
+    header = str(http.session.headers["Authorization"])
+    assert header.startswith("Basic ")
+    encoded = header.split(" ", 1)[1].strip()
+    assert base64.b64decode(encoded).decode("utf-8") == "u:p"
+
+
+def test_connect_basic_requires_username_and_password() -> None:
+    """
+    It raises ValueError when Basic credentials are missing.
+    """
+
+    props_missing_user = HttpLinkedServiceTypedProperties(
+        host="api.example.test",
+        auth_type="Basic",
+        username_key_value=None,
+        password_key_value="p",
+    )
+    service_missing_user = HttpLinkedService(typed_properties=props_missing_user)
+    with pytest.raises(ValueError):
+        service_missing_user.connect()
+
+    props_missing_pass = HttpLinkedServiceTypedProperties(
+        host="api.example.test",
+        auth_type="Basic",
+        username_key_value="u",
+        password_key_value=None,
+    )
+    service_missing_pass = HttpLinkedService(typed_properties=props_missing_pass)
+    with pytest.raises(ValueError):
+        service_missing_pass.connect()
 
 
 def test_connect_bearer_sets_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -125,6 +125,7 @@ class Http(LoggingMixin):
         self.log.debug(
             f"[{request_id}] Initiating {method} request to {url} with timeout={kwargs.get('timeout', self._cfg.timeout_seconds)}s"
         )
+        kwargs.setdefault("timeout", self._cfg.timeout_seconds)
         self.log.debug(f"[{request_id}] Acquiring rate limit token (available: {self._bucket.tokens})")
         self._bucket.acquire()
         self.log.debug(f"[{request_id}] Rate limit token acquired (remaining: {self._bucket.tokens})")
@@ -139,8 +140,7 @@ class Http(LoggingMixin):
         )
 
         response.raise_for_status()
-        # TODO: 1. transport check
-        # TODO: 2
+
         self.log.debug(f"[{request_id}] Request successful - status {response.status_code}")
         return response
 

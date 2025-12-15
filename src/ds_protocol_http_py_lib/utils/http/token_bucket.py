@@ -64,12 +64,16 @@ class TokenBucket:
         Acquire a token from the bucket, waiting if necessary.
         :return: None
         """
-        with self._lock:
-            now = time.perf_counter()
-            self.tokens = min(self.capacity, self.tokens + (now - self.last) * self.rps)
-            self.last = now
-            if self.tokens >= 1.0:
-                self.tokens -= 1.0
-                return
-            wait = (1.0 - self.tokens) / self.rps
-        time.sleep(wait)
+        while True:
+            with self._lock:
+                now = time.perf_counter()
+                self.tokens = min(self.capacity, self.tokens + (now - self.last) * self.rps)
+                self.last = now
+
+                if self.tokens >= 1.0:
+                    self.tokens -= 1.0
+                    return
+
+                wait = (1.0 - self.tokens) / self.rps
+
+            time.sleep(wait)
