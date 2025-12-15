@@ -45,6 +45,7 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",
+    "requests-mock>=1.12.1",
     "types-requests>=2.31.0",
     "pre-commit>=3.6.0",
     "build>=1.0.0",
@@ -57,6 +58,7 @@ test = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",
+    "requests-mock>=1.12.1",
 ]
 docs = [
     "sphinx>=7.1.0",
