@@ -10,7 +10,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 )
 from requests import HTTPError
 
-from .. import __name__, __version__
+from .. import PACKAGE_NAME, __version__
 from ..enums import ResourceKind
 from ..utils import find_keys_in_json
 from ..utils.http.config import HttpConfig, RetryConfig
@@ -114,7 +114,7 @@ class HttpLinkedService(
         config = HttpConfig(
             headers=dict(self.typed_properties.headers or {}),
             timeout_seconds=30,
-            user_agent=f"{__name__}/{__version__}",
+            user_agent=f"{PACKAGE_NAME}/{__version__}",
             retry=retry_config,
         )
         token_bucket = TokenBucket(rps=10, capacity=20)
