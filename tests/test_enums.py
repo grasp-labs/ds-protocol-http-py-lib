@@ -16,7 +16,7 @@ def test_resource_kind_values_are_stable() -> None:
     It defines stable string values for resource kinds.
     """
 
-    assert ResourceKind.LINKED_SERVICE == "DS.RESOURCE.LINKED_SERVICE.HTTP"
+    assert ResourceKind.LINKED_SERVICE == "DS.RESOURCE.LINKED-SERVICE.HTTP"
     assert ResourceKind.DATASET == "DS.RESOURCE.DATASET.HTTP"
 
 
