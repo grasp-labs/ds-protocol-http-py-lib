@@ -12,11 +12,12 @@ Covers:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
-from requests import HTTPError, Response
+from requests import HTTPError, Request, Response
 
 
 @dataclass(slots=True)
@@ -36,19 +37,57 @@ class TrackingBucket:
         return self.tokens
 
 
-@dataclass(slots=True)
-class ProviderResponse:
+def build_response(
+    *,
+    status_code: int = 200,
+    body: str | bytes = b"",
+    url: str = "https://example.test/",
+    method: str = "GET",
+    reason: str = "OK",
+    headers: dict[str, str] | None = None,
+    request_body: Any | None = None,
+) -> Response:
     """
-    Minimal response used by provider Http unit tests.
+    Build a realistic requests.Response (incl. .request.method and .text).
+
+    This keeps tests close to real requests behavior since production code
+    relies on Response attributes like: url, reason, request.method, text/content.
     """
+    resp = Response()
+    resp.status_code = int(status_code)
+    resp.url = url
+    resp.reason = reason
+    # requests.Response.headers is a CaseInsensitiveDict, but accepting a plain dict is fine at runtime.
+    resp.headers = dict(headers or {})  # type: ignore[assignment]
+    resp._content = body.encode("utf-8") if isinstance(body, str) else body
 
-    status_code: int
-    headers: dict[str, str]
-    raise_error: Exception | None = None
+    # Attach a PreparedRequest so production code can access response.request.method/body.
+    req = Request(method=method, url=url, data=request_body).prepare()
+    resp.request = req
+    return resp
 
-    def raise_for_status(self) -> None:
-        if self.raise_error is not None:
-            raise self.raise_error
+
+def json_response(
+    payload: Any,
+    *,
+    status_code: int = 200,
+    url: str = "https://example.test/token",
+    method: str = "POST",
+    reason: str = "OK",
+    headers: dict[str, str] | None = None,
+) -> Response:
+    """
+    Convenience builder for JSON responses.
+    """
+    hdrs = {"Content-Type": "application/json", **dict(headers or {})}
+    return build_response(
+        status_code=status_code,
+        body=json.dumps(payload),
+        url=url,
+        method=method,
+        reason=reason,
+        headers=hdrs,
+    )
 
 
 @dataclass(slots=True)
@@ -57,7 +96,8 @@ class ProviderSession:
     Minimal requests.Session replacement for provider Http tests.
     """
 
-    response: ProviderResponse
+    response: Response
+    request_error: Exception | None = None
     last: tuple[str, str, dict[str, Any]] | None = None
     closed: bool = False
     headers: dict[str, str] | None = None
@@ -66,8 +106,17 @@ class ProviderSession:
         if self.headers is None:
             self.headers = {}
 
-    def request(self, method: str, url: str, **kwargs: Any) -> ProviderResponse:
+    def request(self, method: str, url: str, **kwargs: Any) -> Response:
         self.last = (method, url, dict(kwargs))
+        if self.request_error is not None:
+            raise self.request_error
+        # Make sure response fields match the call site (url/method/body).
+        self.response.url = url
+        self.response.request = Request(
+            method=method,
+            url=url,
+            data=kwargs.get("data"),
+        ).prepare()
         return self.response
 
     def close(self) -> None:
@@ -91,9 +140,12 @@ class HttpClient:
 
     response: HttpResponseBytes
     last_request: dict[str, Any] | None = None
+    error: Exception | None = None
 
     def request(self, **kwargs: Any) -> HttpResponseBytes:
         self.last_request = dict(kwargs)
+        if self.error is not None:
+            raise self.error
         return self.response
 
 
@@ -144,18 +196,6 @@ class DeserializerStub:
 
 
 @dataclass(slots=True)
-class JsonResponse:
-    """
-    Minimal response with .json() for linked service tests.
-    """
-
-    json_data: Any
-
-    def json(self) -> Any:
-        return self.json_data
-
-
-@dataclass(slots=True)
 class LinkedServiceHttp:
     """
     Minimal Http-like object used by HttpLinkedService tests.
@@ -165,6 +205,7 @@ class LinkedServiceHttp:
     post_response: Any | None = None
     post_error: Exception | None = None
     get_error: Exception | None = None
+    get_response: Any | None = None
 
     def post(self, url: str, **kwargs: Any) -> Any:
         if self.post_error is not None:
@@ -174,15 +215,26 @@ class LinkedServiceHttp:
     def get(self, url: str, **kwargs: Any) -> Any:
         if self.get_error is not None:
             raise self.get_error
-        return object()
+        return self.get_response if self.get_response is not None else object()
 
 
-def http_error(status_code: int, body: str) -> HTTPError:
+def http_error(
+    status_code: int,
+    body: str,
+    *,
+    url: str = "https://example.test/token",
+    method: str = "POST",
+    reason: str = "Error",
+) -> HTTPError:
     """
     Create a requests.HTTPError with a populated response.
     """
 
-    resp = Response()
-    resp.status_code = status_code
-    resp._content = body.encode("utf-8")
+    resp = build_response(
+        status_code=status_code,
+        body=body,
+        url=url,
+        method=method,
+        reason=reason,
+    )
     return HTTPError("boom", response=resp)
