@@ -23,6 +23,12 @@ from typing import Any
 
 import requests
 from ds_common_logger_py_lib.mixin import LoggingMixin
+from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
+    AuthenticationError,
+    AuthorizationError,
+    ConnectionError,
+)
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -88,6 +94,44 @@ class Http(LoggingMixin):
         session.mount("https://", adapter)
         return session
 
+    def _response_info(self, response: requests.Response) -> dict[str, Any]:
+        """
+        Get information about a response.
+        Extracts the status code, URL, method, reason, content, and body from the response.
+
+        Args:
+            response: The HTTP response object to extract info from.
+
+        Returns:
+            dict[str, Any]: Dictionary containing the response information.
+        """
+        info = {
+            "status_code": response.status_code,
+            "url": response.url,
+            "method": response.request.method,
+            "reason": response.reason,
+        }
+        try:
+            req = response.request
+
+            body = getattr(req, "body", None)
+            if body is not None:
+                if isinstance(body, bytes):
+                    body_preview = body[:500].decode("utf-8", errors="replace")
+                elif isinstance(body, str):
+                    body_preview = body[:500]
+                else:
+                    body_preview = str(body)[:500]
+            else:
+                body_preview = None
+
+            info["content"] = response.content[:500] if response.content is not None else None
+            info["body"] = body_preview
+        except Exception as exc:
+            self.log.warning(f"Failed to get full response info: {exc}")
+
+        return info
+
     # ---- context ----
     @property
     def session(self) -> requests.Session:
@@ -147,16 +191,72 @@ class Http(LoggingMixin):
         self._bucket.acquire()
         self.log.debug(f"[{request_id}] Rate limit token acquired (remaining: {self._bucket.tokens})")
 
-        response = self._session.request(method, url, **kwargs)
+        response_info = None
+        try:
+            response = self._session.request(method, url, **kwargs)
+            duration = time.time() - start_time
+            response_info = self._response_info(response)
+            self.log.debug(
+                f"[{request_id}] Request completed in {duration:.3f}s "
+                f"with status {response.status_code} "
+                f"and response: {response_info}"
+            )
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            self.log.exception(f"HTTP error: {exc} with response: {response_info}")
+            if exc.response.status_code == 401:
+                raise AuthenticationError(
+                    message=f"Authentication error: {exc}",
+                    details={
+                        "response_body": exc.response.text,
+                        "reason": exc.response.reason,
+                        "url": exc.response.url,
+                        "method": exc.response.request.method,
+                    },
+                ) from exc
+            elif exc.response.status_code == 403:
+                raise AuthorizationError(
+                    message=f"Authorization error: {exc}",
+                    details={
+                        "response_body": exc.response.text,
+                        "reason": exc.response.reason,
+                        "url": exc.response.url,
+                        "method": exc.response.request.method,
+                    },
+                ) from exc
+            raise ResourceException(
+                message=f"HTTP error: {exc}",
+                status_code=exc.response.status_code,
+                details={
+                    "response_body": exc.response.text,
+                    "reason": exc.response.reason,
+                    "url": exc.response.url,
+                    "method": exc.response.request.method,
+                },
+            ) from exc
+        except requests.exceptions.ConnectionError as exc:
+            self.log.exception(f"Connection error: {exc} with response: {response_info}")
+            raise ConnectionError(
+                message=f"Connection error: {exc}",
+                details={
+                    "url": url,
+                    "method": method,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            ) from exc
+        except Exception as exc:
+            self.log.exception(f"HTTP request error: {exc} with response: {response_info}")
+            raise ResourceException(
+                message=f"HTTP error: {exc}",
+                details={
+                    "url": url,
+                    "method": method,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            ) from exc
 
-        duration = time.time() - start_time
-        self.log.debug(
-            f"[{request_id}] Request completed in {duration:.3f}s "
-            f"with status {response.status_code} "
-            f"(content-length: {response.headers.get('content-length', 'unknown')})"
-        )
-
-        response.raise_for_status()
         return response
 
     # ---- convenience methods ----
