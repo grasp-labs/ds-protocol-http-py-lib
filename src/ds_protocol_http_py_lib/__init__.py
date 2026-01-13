@@ -15,6 +15,5 @@ Example:
 
 from importlib.metadata import version
 
-
 __version__ = version("ds-protocol-http-py-lib")
 __all__ = ["__version__"]
