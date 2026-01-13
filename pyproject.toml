@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ds-protocol-http-py-lib"
-dynamic = ["version"]
+version = "0.1.0-alpha.1"
 description = "A Python package from the ds-protocol library collection"
 dependencies = [
     "ds-resource-plugin-py-lib>=0.1.0a2, <1.0.0",
@@ -72,9 +72,6 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 ds_protocol_http_py_lib = ["resource.yaml", "py.typed"]
-
-[tool.setuptools.dynamic]
-version = {file = "VERSION.txt"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
