@@ -8,10 +8,6 @@ Example:
     >>> data = {"user": {"token": "abc123"}}
     >>> find_keys_in_json(data, {"token"})
     'abc123'
-    >>> data = [{"user": {"token": "abc123"}}, {"user": {"token": "def456"}}]
-    >>> find_keys_in_json(data, {"token"})
-    'abc123'
-    'def456'
 """
 
 from typing import Any
