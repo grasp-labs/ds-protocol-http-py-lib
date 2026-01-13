@@ -1,4 +1,7 @@
 """
+**File:** ``conftest.py``
+**Region:** ``tests/conftest``
+
 Pytest shared fixtures.
 
 Covers:

@@ -1,4 +1,7 @@
 """
+**File:** ``mocks.py``
+**Region:** ``tests/mocks``
+
 Centralized test doubles used across unit tests.
 
 Covers:
@@ -27,6 +30,10 @@ class TrackingBucket:
 
     def acquire(self) -> None:
         self.called += 1
+
+    def available(self) -> float:
+        # Mirror TokenBucket.available() API for provider logging without mutating state.
+        return self.tokens
 
 
 @dataclass(slots=True)

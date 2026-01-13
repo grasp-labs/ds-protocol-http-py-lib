@@ -1,4 +1,7 @@
 """
+**File:** ``test_provider.py``
+**Region:** ``tests/utils/http/test_provider``
+
 HTTP provider tests.
 
 Covers:

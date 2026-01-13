@@ -1,3 +1,21 @@
+"""
+**File:** ``http.py``
+**Region:** ``ds_protocol_http_py_lib/linked_service/http``
+
+HTTP Linked Service
+
+This module implements a linked service for HTTP APIs.
+
+Example:
+    >>> linked_service = HttpLinkedService(
+    ...     typed_properties=HttpLinkedServiceTypedProperties(
+    ...         host="https://api.example.com",
+    ...         auth_type="OAuth2",
+    ...     ),
+    ... )
+    >>> linked_service.connect()
+"""
+
 import base64
 from dataclasses import dataclass, field
 from typing import Generic, Literal, TypeVar
@@ -7,7 +25,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service import (
     LinkedServiceTypedProperties,
 )
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
-    AuthenticationException,
+    AuthenticationError,
 )
 from requests import HTTPError
 
@@ -108,13 +126,13 @@ class HttpLinkedService(
             total=3,
             backoff_factor=0.2,
             status_forcelist=(429, 500, 502, 503, 504),
-            allowed_methods=("GET", "POST"),
+            allowed_methods=("GET", "POST", "PUT", "DELETE", "PATCH"),
             raise_on_status=False,
             respect_retry_after_header=True,
         )
         config = HttpConfig(
             headers=dict(self.typed_properties.headers or {}),
-            timeout_seconds=30,
+            timeout_seconds=60,
             user_agent=f"{PACKAGE_NAME}/{__version__}",
             retry=retry_config,
         )
@@ -151,7 +169,7 @@ class HttpLinkedService(
             if token is None:
                 raise ValueError("Token not found in response")
         except HTTPError as exc:
-            raise AuthenticationException(
+            raise AuthenticationError(
                 message=f"Authentication error: {exc}",
                 details={
                     "http_status_code": exc.response.status_code,
@@ -159,7 +177,7 @@ class HttpLinkedService(
                 },
             ) from exc
         except Exception as exc:
-            raise AuthenticationException(
+            raise AuthenticationError(
                 message=f"Authentication error: {exc}",
                 details={
                     "error_type": type(exc).__name__,
@@ -201,7 +219,7 @@ class HttpLinkedService(
             if token is None:
                 raise ValueError("Token not found in response")
         except HTTPError as exc:
-            raise AuthenticationException(
+            raise AuthenticationError(
                 message=f"Authentication error: {exc}",
                 details={
                     "http_status_code": exc.response.status_code,
@@ -209,7 +227,7 @@ class HttpLinkedService(
                 },
             ) from exc
         except Exception as exc:
-            raise AuthenticationException(
+            raise AuthenticationError(
                 message=f"Authentication error: {exc}",
                 details={
                     "error_type": type(exc).__name__,

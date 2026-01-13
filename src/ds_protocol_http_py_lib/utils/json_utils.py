@@ -1,7 +1,17 @@
 """
-File: json_utils.py
-Description: Utility functions for working with JSON data structures.
-Region: packages/shared
+**File:** ``json_utils.py``
+**Region:** ``ds_protocol_http_py_lib/utils/json_utils``
+
+Utility functions for working with JSON data structures.
+
+Example:
+    >>> data = {"user": {"token": "abc123"}}
+    >>> find_keys_in_json(data, {"token"})
+    'abc123'
+    >>> data = [{"user": {"token": "abc123"}}, {"user": {"token": "def456"}}]
+    >>> find_keys_in_json(data, {"token"})
+    'abc123'
+    'def456'
 """
 
 from typing import Any

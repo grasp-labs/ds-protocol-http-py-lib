@@ -1,4 +1,7 @@
 """
+**File:** ``test_linked_service_http.py``
+**Region:** ``tests/linked_service/test_linked_service_http``
+
 HttpLinkedService behavior tests.
 
 Covers:
@@ -14,7 +17,7 @@ import base64
 from typing import Any, cast
 
 import pytest
-from ds_resource_plugin_py_lib.common.resource.linked_service.errors import AuthenticationException
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import AuthenticationError
 
 from ds_protocol_http_py_lib.linked_service.http import HttpLinkedService, HttpLinkedServiceTypedProperties
 from tests.mocks import JsonResponse, LinkedServiceHttp, http_error
@@ -65,7 +68,7 @@ def test_fetch_user_token_requires_token_endpoint() -> None:
 
 def test_fetch_user_token_raises_authentication_exception_on_http_error() -> None:
     """
-    It wraps HTTPError into AuthenticationException with response details.
+    It wraps HTTPError into AuthenticationError with response details.
     """
 
     props = HttpLinkedServiceTypedProperties(
@@ -77,14 +80,14 @@ def test_fetch_user_token_raises_authentication_exception_on_http_error() -> Non
     )
     service = HttpLinkedService(typed_properties=props)
     fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_error=http_error(401, "nope"))
-    with pytest.raises(AuthenticationException) as exc_info:
+    with pytest.raises(AuthenticationError) as exc_info:
         service._fetch_user_token(cast("Any", fake_http))
     assert exc_info.value.details["http_status_code"] == 401
 
 
 def test_fetch_user_token_raises_authentication_exception_when_token_is_missing() -> None:
     """
-    It raises AuthenticationException when the response JSON has no token field.
+    It raises AuthenticationError when the response JSON has no token field.
     """
 
     props = HttpLinkedServiceTypedProperties(
@@ -96,7 +99,7 @@ def test_fetch_user_token_raises_authentication_exception_when_token_is_missing(
     )
     service = HttpLinkedService(typed_properties=props)
     fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_response=JsonResponse({"x": "y"}))
-    with pytest.raises(AuthenticationException) as exc_info:
+    with pytest.raises(AuthenticationError) as exc_info:
         service._fetch_user_token(cast("Any", fake_http))
     assert exc_info.value.details["error_type"] == "ValueError"
 
@@ -143,7 +146,7 @@ def test_fetch_oauth2_token_requires_token_endpoint() -> None:
 
 def test_fetch_oauth2_token_raises_authentication_exception_when_token_is_missing() -> None:
     """
-    It raises AuthenticationException when the response JSON has no token field.
+    It raises AuthenticationError when the response JSON has no token field.
     """
 
     props = HttpLinkedServiceTypedProperties(
@@ -156,7 +159,7 @@ def test_fetch_oauth2_token_raises_authentication_exception_when_token_is_missin
     )
     service = HttpLinkedService(typed_properties=props)
     fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_response=JsonResponse({"x": "y"}))
-    with pytest.raises(AuthenticationException) as exc_info:
+    with pytest.raises(AuthenticationError) as exc_info:
         service._fetch_oauth2_token(cast("Any", fake_http))
     assert exc_info.value.details["error_type"] == "ValueError"
 

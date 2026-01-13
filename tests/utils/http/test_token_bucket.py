@@ -1,4 +1,7 @@
 """
+**File:** ``test_token_bucket.py``
+**Region:** ``tests/utils/http/test_token_bucket``
+
 Token bucket rate limiter tests.
 
 Covers:
@@ -47,3 +50,20 @@ def test_token_bucket_capacity_falls_back_when_zero_capacity_provided(fake_clock
     fake_clock(0.0)
     bucket = TokenBucket(rps=7.0, capacity=0)
     assert bucket.capacity == 14
+
+
+def test_token_bucket_available_does_not_mutate_state(fake_clock) -> None:
+    """
+    available() should reflect refill over time but must not mutate tokens/last.
+    """
+    fake_clock(0.0)
+    bucket = TokenBucket(rps=10.0, capacity=2)
+    bucket.tokens = 0.0
+    bucket.last = 0.0
+
+    fake_clock(0.1)  # would refill to 1.0
+    before_tokens = bucket.tokens
+    before_last = bucket.last
+    assert bucket.available() == 1.0
+    assert bucket.tokens == before_tokens
+    assert bucket.last == before_last

@@ -1,4 +1,7 @@
 """
+**File:** ``test_config.py``
+**Region:** ``tests/utils/http/test_config``
+
 HTTP configuration tests.
 
 Covers:

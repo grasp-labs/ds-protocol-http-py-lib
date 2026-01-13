@@ -1,3 +1,30 @@
+"""
+**File:** ``http.py``
+**Region:** ``ds_protocol_http_py_lib/dataset/http``
+
+HTTP Dataset
+
+This module implements a dataset for HTTP APIs.
+
+Example:
+    >>> dataset = HttpDataset(
+    ...     deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
+    ...     serializer=PandasSerializer(format=DatasetStorageFormatType.JSON),
+    ...     typed_properties=HttpDatasetTypedProperties(
+    ...         url="https://api.example.com/data",
+    ...         method="GET",
+    ...     ),
+    ...     linked_service=HttpLinkedService(
+    ...         typed_properties=HttpLinkedServiceTypedProperties(
+    ...             host="https://api.example.com",
+    ...             auth_type="OAuth2",
+    ...         ),
+    ...     ),
+    ... )
+    >>> dataset.read()
+    >>> data = dataset.content
+"""
+
 from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, NoReturn, TypeVar
 
@@ -8,7 +35,7 @@ from ds_resource_plugin_py_lib.common.resource.dataset import (
     TabularDataset,
 )
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
-    ConnectionException,
+    ConnectionError,
 )
 from ds_resource_plugin_py_lib.common.serde.deserialize import (
     DataDeserializer,
@@ -48,7 +75,12 @@ HttpLinkedServiceType = TypeVar(
 
 @dataclass(kw_only=True)
 class HttpDataset(
-    TabularDataset[HttpLinkedServiceType, HttpDatasetTypedPropertiesType],
+    TabularDataset[
+        HttpLinkedServiceType,
+        HttpDatasetTypedPropertiesType,
+        DataSerializer,
+        DataDeserializer,
+    ],
     Generic[HttpLinkedServiceType, HttpDatasetTypedPropertiesType],
 ):
     linked_service: HttpLinkedServiceType
@@ -78,7 +110,7 @@ class HttpDataset(
             kwargs: Additional keyword arguments to pass to the request.
         """
         if self.connection is None:
-            raise ConnectionException(
+            raise ConnectionError(
                 message="Connection is not initialized.",
                 code="NOT_INITIALIZED",
                 status_code=503,
@@ -110,11 +142,7 @@ class HttpDataset(
             kwargs: Additional keyword arguments to pass to the request.
         """
         if self.connection is None:
-            raise ConnectionException(
-                message="Connection is not initialized.",
-                code="NOT_INITIALIZED",
-                status_code=503,
-            )
+            raise ConnectionError(message="Connection is not initialized.")
 
         self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
 

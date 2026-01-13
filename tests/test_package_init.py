@@ -1,4 +1,7 @@
 """
+**File:** ``test_package_init.py``
+**Region:** ``tests/test_package_init``
+
 Package initialization tests.
 
 Covers:

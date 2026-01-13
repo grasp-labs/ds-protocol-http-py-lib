@@ -1,4 +1,21 @@
-# provider.py
+"""
+**File:** ``provider.py``
+**Region:** ``ds_protocol_http_py_lib/utils/http/provider``
+
+HTTP Provider
+
+This module implements a synchronous HTTP client with:
+- requests.Session + urllib3.Retry (429/5xx, backoff, Retry-After)
+- optional TokenBucket for simple RPS throttling
+- context-managed lifetime
+- tiny API: request/get/post/close
+
+Example:
+    >>> with Http() as client:
+    ...     response = client.get("https://api.example.com/data")
+    ...     data = response.json()
+"""
+
 import logging
 import time
 from dataclasses import dataclass
@@ -126,7 +143,7 @@ class Http(LoggingMixin):
             f"[{request_id}] Initiating {method} request to {url} with timeout={kwargs.get('timeout', self._cfg.timeout_seconds)}s"
         )
         kwargs.setdefault("timeout", self._cfg.timeout_seconds)
-        self.log.debug(f"[{request_id}] Acquiring rate limit token (available: {self._bucket.tokens})")
+        self.log.debug(f"[{request_id}] Acquiring rate limit token (available: {self._bucket.available()})")
         self._bucket.acquire()
         self.log.debug(f"[{request_id}] Rate limit token acquired (remaining: {self._bucket.tokens})")
 
@@ -140,8 +157,6 @@ class Http(LoggingMixin):
         )
 
         response.raise_for_status()
-
-        self.log.debug(f"[{request_id}] Request successful - status {response.status_code}")
         return response
 
     # ---- convenience methods ----

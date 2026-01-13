@@ -1,4 +1,7 @@
 """
+**File:** ``test_dataset_http.py``
+**Region:** ``tests/dataset/test_dataset_http``
+
 HttpDataset behavior tests.
 
 Covers:
@@ -14,7 +17,7 @@ from typing import Any, cast
 
 import pandas as pd
 import pytest
-from ds_resource_plugin_py_lib.common.resource.linked_service.errors import ConnectionException
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import ConnectionError
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetTypedProperties
 from ds_protocol_http_py_lib.enums import ResourceKind
@@ -36,23 +39,23 @@ def test_post_init_connects_when_linked_service_is_provided() -> None:
 
 def test_create_raises_when_connection_is_missing() -> None:
     """
-    It raises ConnectionException when called without an initialized connection.
+    It raises ConnectionError when called without an initialized connection.
     """
 
     props = HttpDatasetTypedProperties(url="https://example.test/data")
     dataset = HttpDataset(linked_service=cast("Any", None), typed_properties=props)
-    with pytest.raises(ConnectionException):
+    with pytest.raises(ConnectionError):
         dataset.create()
 
 
 def test_read_raises_when_connection_is_missing() -> None:
     """
-    It raises ConnectionException when read is called without an initialized connection.
+    It raises ConnectionError when read is called without an initialized connection.
     """
 
     props = HttpDatasetTypedProperties(url="https://example.test/data")
     dataset = HttpDataset(linked_service=cast("Any", None), typed_properties=props)
-    with pytest.raises(ConnectionException):
+    with pytest.raises(ConnectionError):
         dataset.read()
 
 

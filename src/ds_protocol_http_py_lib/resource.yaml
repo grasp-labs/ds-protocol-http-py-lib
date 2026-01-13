@@ -11,7 +11,7 @@ dataset:
 
 linked_service:
   - name: HTTP
-    kind: DS.RESOURCE.LINKED-SERVICE.HTTP
+    kind: DS.RESOURCE.LINKED_SERVICE.HTTP
     version: 1.0.0
     description: HTTP linked service
     class_name: ds_protocol_http_py_lib.linked_service.http.HttpLinkedService

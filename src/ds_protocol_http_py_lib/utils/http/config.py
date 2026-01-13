@@ -1,5 +1,15 @@
 """
+**File:** ``config.py``
+**Region:** ``ds_protocol_http_py_lib/utils/http/config``
+
 Configuration for the HTTP client.
+
+Example:
+    >>> config = HttpConfig(timeout_seconds=10, user_agent="MyUA/1.0")
+    >>> retry = RetryConfig(total=3, backoff_factor=0.2, status_forcelist=(429, 500, 502, 503, 504))
+    >>> http = Http(config=config, retry=retry)
+    >>> response = http.get("https://api.example.com/data")
+    >>> data = response.json()
 """
 
 from collections.abc import Mapping
@@ -23,7 +33,7 @@ class RetryConfig:
     total: int = 3
     backoff_factor: float = 0.2
     status_forcelist: tuple[int, ...] = (429, 500, 502, 503, 504)
-    allowed_methods: tuple[str, ...] = ("GET",)
+    allowed_methods: tuple[str, ...] = ("GET", "POST", "PUT", "DELETE", "PATCH")
     raise_on_status: bool = False
     respect_retry_after_header: bool = True
 

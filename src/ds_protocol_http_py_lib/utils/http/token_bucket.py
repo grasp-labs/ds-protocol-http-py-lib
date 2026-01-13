@@ -1,4 +1,7 @@
 """
+**File:** ``token_bucket.py``
+**Region:** ``ds_protocol_http_py_lib/utils/http/token_bucket``
+
 Token Bucket Rate Limiter
 
 This module implements a cooperative token bucket algorithm for rate limiting HTTP requests.
@@ -12,13 +15,20 @@ Key features:
 - Adjustable capacity for burst handling
 - Cooperative design that works well with threading.Lock
 - Global RPS cap across all concurrent operations
+
+Example:
+    >>> limiter = TokenBucket(rps=10.0, capacity=20)
+    >>> limiter.acquire()
+    >>> # Make your HTTP request here
 """
 
 import threading
 import time
 
+from ds_common_logger_py_lib.mixin import LoggingMixin
 
-class TokenBucket:
+
+class TokenBucket(LoggingMixin):
     """
     Token Bucket Rate Limiter
 
@@ -76,4 +86,16 @@ class TokenBucket:
 
                 wait = (1.0 - self.tokens) / self.rps
 
+            self.log.debug(f"Waiting {wait} seconds for token")
             time.sleep(wait)
+
+    def available(self) -> float:
+        """
+        Return the current available token count *without mutating* internal state.
+
+        This computes how many tokens would be available if we refilled based on
+        elapsed time, but it does not update `tokens` or `last`.
+        """
+        with self._lock:
+            now = time.perf_counter()
+            return min(self.capacity, self.tokens + (now - self.last) * self.rps)
