@@ -13,7 +13,7 @@ Key features:
 - Thread-safe using threading.Lock
 - Configurable requests per second (RPS) rate
 - Adjustable capacity for burst handling
-- Cooperative design that works well with threading.Lock
+- Uses threading.Lock for thread-safe operations
 - Global RPS cap across all concurrent operations
 
 Example:
