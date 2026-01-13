@@ -107,6 +107,9 @@ class HttpDataset(
 
         Returns:
             Http: The Http client instance with authentication configured.
+
+        Raises:
+            ConnectionError: If the linked service is not initialized.
         """
         if self.linked_service is None:
             raise ConnectionError(message="Linked service is not initialized.")

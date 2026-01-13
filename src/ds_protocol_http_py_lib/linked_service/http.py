@@ -157,10 +157,7 @@ class HttpLinkedService(
         if not url:
             raise LinkedServiceException(
                 message="Token endpoint is missing in the linked service properties",
-                details={
-                    "type": self.kind,
-                    "token_endpoint": url,
-                },
+                details={"type": self.kind},
             )
 
         response = http.post(
@@ -205,10 +202,7 @@ class HttpLinkedService(
         if not url:
             raise LinkedServiceException(
                 message="Token endpoint is missing in the linked service properties",
-                details={
-                    "type": self.kind,
-                    "token_endpoint": url,
-                },
+                details={"type": self.kind},
             )
 
         response = http.post(
@@ -277,18 +271,12 @@ class HttpLinkedService(
         if not username:
             raise LinkedServiceException(
                 message="Basic auth username is missing in the linked service",
-                details={
-                    "type": self.kind,
-                    "username_key_value": username,
-                },
+                details={"type": self.kind},
             )
         if not password:
             raise LinkedServiceException(
                 message="Basic auth password is missing in the linked service",
-                details={
-                    "type": self.kind,
-                    "password_key_value": password,
-                },
+                details={"type": self.kind},
             )
         token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
         http.session.headers.update({"Authorization": f"Basic {token}"})
@@ -308,18 +296,12 @@ class HttpLinkedService(
         if not self.typed_properties.api_key_name:
             raise LinkedServiceException(
                 message="API key name is missing in the linked service",
-                details={
-                    "type": self.kind,
-                    "api_key_name": self.typed_properties.api_key_name,
-                },
+                details={"type": self.kind},
             )
         if not self.typed_properties.api_key_value:
             raise LinkedServiceException(
                 message="API key value is missing in the linked service",
-                details={
-                    "type": self.kind,
-                    "api_key_value": self.typed_properties.api_key_value,
-                },
+                details={"type": self.kind},
             )
         http.session.headers.update({self.typed_properties.api_key_name: self.typed_properties.api_key_value})
 
@@ -340,10 +322,7 @@ class HttpLinkedService(
         if not self.typed_properties.token_endpoint:
             raise LinkedServiceException(
                 message="Token endpoint is missing in the linked service properties",
-                details={
-                    "type": self.kind,
-                    "token_endpoint": self.typed_properties.token_endpoint,
-                },
+                details={"type": self.kind},
             )
 
         response = http.post(
