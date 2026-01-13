@@ -1,5 +1,5 @@
 """
-A Python package from the ds-common library collection.
+A Python package from the ds-protocol library collection.
 
 **File:** ``__init__.py``
 **Region:** ``ds-protocol-http-py-lib``
@@ -15,5 +15,16 @@ Example:
 
 from importlib.metadata import version
 
-__version__ = version("ds-protocol-http-py-lib")
-__all__ = ["__version__"]
+PACKAGE_NAME = "ds-protocol-http-py-lib"
+__version__ = version(PACKAGE_NAME)
+
+from .dataset import HttpDataset, HttpDatasetTypedProperties  # noqa: E402
+from .linked_service import HttpLinkedService, HttpLinkedServiceTypedProperties  # noqa: E402
+
+__all__ = [
+    "HttpDataset",
+    "HttpDatasetTypedProperties",
+    "HttpLinkedService",
+    "HttpLinkedServiceTypedProperties",
+    "__version__",
+]

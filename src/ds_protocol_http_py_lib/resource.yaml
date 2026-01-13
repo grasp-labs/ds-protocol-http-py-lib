@@ -1,0 +1,17 @@
+package-name: http
+name: http
+description: HTTP protocol for the DS Business Workflow
+
+dataset:
+  - name: HTTP
+    kind: DS.RESOURCE.DATASET.HTTP
+    version: 1.0.0
+    description: HTTP dataset
+    class_name: ds_protocol_http_py_lib.dataset.http.HttpDataset
+
+linked_service:
+  - name: HTTP
+    kind: DS.RESOURCE.LINKED_SERVICE.HTTP
+    version: 1.0.0
+    description: HTTP linked service
+    class_name: ds_protocol_http_py_lib.linked_service.http.HttpLinkedService

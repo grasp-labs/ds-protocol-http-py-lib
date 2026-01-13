@@ -43,7 +43,7 @@ lint: ## Lint with ruff
 
 .PHONY: format
 format: ## Format with ruff
-	uv run ruff format --config .config/ruff.toml .
+	uv run ruff format --config .config/ruff.toml $(SRC_DIR) $(TEST_DIR)
 
 .PHONY: type-check
 type-check: ## Type-check with mypy
