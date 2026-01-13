@@ -84,7 +84,7 @@ jobs:
       DOMAIN: ds
       AWS_REGION: eu-north-1
       SERVICE_GROUP: packages
-      SERVICE_NAME: "${{ github.event.repository.name }}"
+      SERVICE_NAME: "ds-protocol-http-py-lib"
       TABLE_NAME: ds-coordination-release-fragments-prod
 
     steps:
