@@ -55,7 +55,6 @@ from ds_resource_plugin_py_lib.common.serde.serialize import (
 
 from ..enums import ResourceKind
 from ..linked_service.http import HttpLinkedService
-from ..utils.http.provider import Http
 
 
 @dataclass(kw_only=True)
@@ -99,23 +98,6 @@ class HttpDataset(
     deserializer: DataDeserializer | None = field(
         default_factory=lambda: PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
-    connection: Http | None = field(default=None, init=False)
-
-    def connect(self) -> Http:
-        """
-        Connect to the HTTP API.
-
-        Returns:
-            Http: The Http client instance with authentication configured.
-
-        Raises:
-            ConnectionError: If the linked service is not initialized.
-        """
-        if self.linked_service is None:
-            raise ConnectionError(message="Linked service is not initialized.")
-
-        self.connection = self.linked_service.connect()
-        return self.connection
 
     @property
     def kind(self) -> ResourceKind:
@@ -128,13 +110,13 @@ class HttpDataset(
         Args:
             kwargs: Additional keyword arguments to pass to the request.
         """
-        if self.connection is None:
+        if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
         self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
 
         try:
-            response = self.connection.request(
+            response = self.linked_service.connection.request(
                 method=self.typed_properties.method,
                 url=self.typed_properties.url,
                 data=self.typed_properties.data,
@@ -147,7 +129,7 @@ class HttpDataset(
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
         except ResourceException as exc:
-            exc.details.update({"type": self.kind})
+            exc.details.update({"type": self.kind.value})
             raise WriteError(
                 message=exc.message,
                 status_code=exc.status_code,
@@ -169,13 +151,13 @@ class HttpDataset(
         Args:
             kwargs: Additional keyword arguments to pass to the request.
         """
-        if self.connection is None:
+        if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
         self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
 
         try:
-            response = self.connection.request(
+            response = self.linked_service.connection.request(
                 method=self.typed_properties.method,
                 url=self.typed_properties.url,
                 data=self.typed_properties.data,
@@ -188,7 +170,7 @@ class HttpDataset(
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
         except ResourceException as exc:
-            exc.details.update({"type": self.kind})
+            exc.details.update({"type": self.kind.value})
             raise ReadError(
                 message=exc.message,
                 status_code=exc.status_code,

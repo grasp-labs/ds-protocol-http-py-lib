@@ -43,7 +43,7 @@ def main() -> pd.DataFrame:
 
     frames = []
     try:
-        dataset.connect()
+        dataset.linked_service.connect()
         while dataset.next:
             dataset.read()
             logger.info("Dataset next: %s", dataset.next)

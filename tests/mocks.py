@@ -156,9 +156,11 @@ class LinkedService:
     """
 
     http: HttpClient
+    connection: HttpClient | None = None
 
     def connect(self) -> HttpClient:
-        return self.http
+        self.connection = self.http
+        return self.connection
 
 
 class SerializerSpy:
