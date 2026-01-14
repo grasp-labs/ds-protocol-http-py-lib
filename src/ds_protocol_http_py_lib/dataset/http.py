@@ -138,9 +138,7 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.content = self.deserializer(response.content)
-            self.schema = {
-                col: str(dtype) for col, dtype in self.content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()
-            }
+            self._set_schema(self.content)
         else:
             self.content = pd.DataFrame()
 
@@ -179,9 +177,7 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.content = self.deserializer(response.content)
-            self.schema = {
-                col: str(dtype) for col, dtype in self.content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()
-            }
+            self._set_schema(self.content)
             self.next = self.deserializer.get_next(response.content)
             if self.next:
                 self.cursor = self.deserializer.get_end_cursor(response.content)
@@ -198,3 +194,12 @@ class HttpDataset(
 
     def rename(self, **kwargs: Any) -> NoReturn:
         raise NotImplementedError("Rename operation is not supported for Http datasets")
+
+    def _set_schema(self, content: pd.DataFrame) -> None:
+        """
+        Set the schema from the content.
+
+        Args:
+            content: The content to set the schema from.
+        """
+        self.schema = {col: str(dtype) for col, dtype in content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()}

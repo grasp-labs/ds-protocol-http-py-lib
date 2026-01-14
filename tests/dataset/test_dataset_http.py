@@ -280,3 +280,24 @@ def test_dataset_unimplemented_methods_raise() -> None:
         dataset.update()
     with pytest.raises(NotImplementedError):
         dataset.rename()
+
+
+def test_set_schema_populates_schema_from_dataframe() -> None:
+    """
+    It derives a string schema mapping from the dataframe columns/dtypes.
+    """
+    props = HttpDatasetTypedProperties(url="https://example.test/data")
+    dataset = HttpDataset(
+        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))),
+        typed_properties=props,
+    )
+    df = pd.DataFrame(
+        {
+            "a": [1, 2, 3],
+            "b": ["x", "y", "z"],
+            "c": [True, False, True],
+        }
+    )
+    dataset._set_schema(df)
+    assert set(dataset.schema.keys()) == {"a", "b", "c"}
+    assert all(isinstance(v, str) and v for v in dataset.schema.values())
