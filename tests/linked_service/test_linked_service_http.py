@@ -224,6 +224,8 @@ def test_connect_apikey_updates_session_headers() -> None:
     )
     service = HttpLinkedService(typed_properties=props)
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     assert http.session.headers["X-API-Key"] == "k"
 
 
@@ -266,6 +268,8 @@ def test_connect_basic_sets_authorization_header() -> None:
     )
     service = HttpLinkedService(typed_properties=props)
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     header = str(http.session.headers["Authorization"])
     assert header.startswith("Basic ")
     encoded = header.split(" ", 1)[1].strip()
@@ -311,6 +315,8 @@ def test_connect_bearer_sets_authorization_header(monkeypatch: pytest.MonkeyPatc
     service = HttpLinkedService(typed_properties=props)
     monkeypatch.setattr(service, "_fetch_user_token", lambda http: "bt")
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     assert http.session.headers["Authorization"] == "Bearer bt"
 
 
@@ -330,6 +336,8 @@ def test_connect_oauth2_sets_authorization_header(monkeypatch: pytest.MonkeyPatc
     service = HttpLinkedService(typed_properties=props)
     monkeypatch.setattr(service, "_fetch_oauth2_token", lambda http: "ot")
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     assert http.session.headers["Authorization"] == "Bearer ot"
 
 
@@ -366,6 +374,7 @@ def test_connect_custom_sets_bearer_authorization_header(token_payloads) -> None
         ),
     )
     http = service.connect()
+    assert service.connection is http
     assert http.session.headers["Authorization"] == "Bearer t3"
 
 
