@@ -109,6 +109,12 @@ class HttpDataset(
 
         Args:
             kwargs: Additional keyword arguments to pass to the request.
+
+        Raises:
+            AuthenticationError: If the authentication fails.
+            AuthorizationError: If the authorization fails.
+            ConnectionError: If the connection fails.
+            WriteError: If the write error occurs.
         """
         if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
@@ -148,6 +154,12 @@ class HttpDataset(
 
         Args:
             kwargs: Additional keyword arguments to pass to the request.
+
+        Raises:
+            AuthenticationError: If the authentication fails.
+            AuthorizationError: If the authorization fails.
+            ConnectionError: If the connection fails.
+            ReadError: If the read error occurs.
         """
         if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")

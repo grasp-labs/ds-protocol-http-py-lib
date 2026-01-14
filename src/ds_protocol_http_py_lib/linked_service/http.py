@@ -149,6 +149,10 @@ class HttpLinkedService(
 
         Returns:
             str: The user token.
+
+        Raises:
+            LinkedServiceException: If the token endpoint is missing.
+            AuthenticationError: If the token is missing in the response.
         """
         url = self.typed_properties.token_endpoint
         headers = {"Content-type": "application/json"}
@@ -192,6 +196,10 @@ class HttpLinkedService(
 
         Returns:
             str: The OAuth2 token.
+
+        Raises:
+            LinkedServiceException: If the token endpoint is missing.
+            AuthenticationError: If the token is missing in the response.
         """
         url = self.typed_properties.token_endpoint
         headers = {"Content-type": "application/x-www-form-urlencoded"}
@@ -319,6 +327,7 @@ class HttpLinkedService(
             http: The Http client instance to configure.
 
         Raises:
+            AuthenticationError: If the token is missing in the response.
             LinkedServiceException: If token endpoint is missing or the token cannot be found.
         """
         if not self.typed_properties.token_endpoint:
@@ -368,12 +377,12 @@ class HttpLinkedService(
         Configures authentication based on the auth_type.
         Updates the session headers with the configured headers.
 
+        Returns:
+            Http: The Http client instance with authentication configured.
+
         Raises:
             AuthenticationError: If the authentication fails.
             LinkedServiceException: If the auth_type is unsupported.
-
-        Returns:
-            Http: The Http client instance with authentication configured.
         """
         if self._http is None:
             self._http = self._init_http()
