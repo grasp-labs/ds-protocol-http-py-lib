@@ -5,7 +5,7 @@
 HttpDataset behavior tests.
 
 Covers:
-- Connection initialization via linked service in __post_init__.
+- Connection initialization via explicit connect() call.
 - create/read request execution and argument propagation.
 - Serializer/deserializer interactions and empty-response handling.
 - Pagination state updates (next/cursor) driven by the deserializer.
@@ -17,23 +17,27 @@ from typing import Any, cast
 
 import pandas as pd
 import pytest
-from ds_resource_plugin_py_lib.common.resource.linked_service.errors import ConnectionError
+from ds_resource_plugin_py_lib.common.resource.dataset.errors import ReadError, WriteError
+from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
+    AuthenticationError,
+    AuthorizationError,
+    ConnectionError,
+)
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetTypedProperties
 from ds_protocol_http_py_lib.enums import ResourceKind
 from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService
 
 
-def test_post_init_connects_when_linked_service_is_provided() -> None:
+def test_dataset_kind_is_dataset() -> None:
     """
-    It initializes the connection by calling linked service connect.
+    It exposes dataset kind.
     """
-
-    http = HttpClient(response=HttpResponseBytes(content=b""))
-    linked_service = LinkedService(http=http)
     props = HttpDatasetTypedProperties(url="https://example.test/data")
-    dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
-    assert dataset.connection is http
+    dataset = HttpDataset(
+        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))), typed_properties=props
+    )
     assert dataset.kind == ResourceKind.DATASET
 
 
@@ -43,7 +47,10 @@ def test_create_raises_when_connection_is_missing() -> None:
     """
 
     props = HttpDatasetTypedProperties(url="https://example.test/data")
-    dataset = HttpDataset(linked_service=cast("Any", None), typed_properties=props)
+    dataset = HttpDataset(
+        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))),
+        typed_properties=props,
+    )
     with pytest.raises(ConnectionError):
         dataset.create()
 
@@ -54,7 +61,10 @@ def test_read_raises_when_connection_is_missing() -> None:
     """
 
     props = HttpDatasetTypedProperties(url="https://example.test/data")
-    dataset = HttpDataset(linked_service=cast("Any", None), typed_properties=props)
+    dataset = HttpDataset(
+        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))),
+        typed_properties=props,
+    )
     with pytest.raises(ConnectionError):
         dataset.read()
 
@@ -73,6 +83,7 @@ def test_create_serializes_and_deserializes_when_content_is_present() -> None:
         typed_properties=props,
         deserializer=cast("Any", deserializer),
     )
+    linked_service.connect()
     dataset.content = pd.DataFrame([{"x": 1}])
     dataset.create()
     assert deserializer.called_with == b'{"ok": 1}'
@@ -97,6 +108,7 @@ def test_create_without_serializer_still_makes_request_and_deserializes() -> Non
         serializer=None,
         deserializer=cast("Any", deserializer),
     )
+    linked_service.connect()
     dataset.content = pd.DataFrame([{"x": 1}])
     dataset.create()
     assert http.last_request is not None
@@ -113,6 +125,7 @@ def test_create_sets_empty_dataframe_when_response_has_no_content() -> None:
     linked_service = LinkedService(http=http)
     props = HttpDatasetTypedProperties(url="https://example.test/data")
     dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    linked_service.connect()
     dataset.create()
     assert isinstance(dataset.content, pd.DataFrame)
     assert dataset.content.empty is True
@@ -132,6 +145,7 @@ def test_read_sets_next_and_cursor_when_deserializer_indicates_more() -> None:
         typed_properties=props,
         deserializer=cast("Any", deserializer),
     )
+    linked_service.connect()
     dataset.read()
     assert dataset.next is True
     assert dataset.cursor == "c"
@@ -151,6 +165,7 @@ def test_read_does_not_set_cursor_when_next_is_false() -> None:
         typed_properties=props,
         deserializer=cast("Any", deserializer),
     )
+    linked_service.connect()
     dataset.read()
     assert dataset.next is False
     assert dataset.cursor is None
@@ -165,8 +180,124 @@ def test_read_sets_defaults_when_response_has_no_content() -> None:
     linked_service = LinkedService(http=http)
     props = HttpDatasetTypedProperties(url="https://example.test/data")
     dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    linked_service.connect()
     dataset.read()
     assert dataset.next is False
     assert dataset.cursor is None
     assert isinstance(dataset.content, pd.DataFrame)
     assert dataset.content.empty is True
+
+
+def test_read_wraps_resource_exception_into_read_error() -> None:
+    """
+    It wraps a provider ResourceException into ReadError and includes dataset type in details.
+    """
+    http = HttpClient(
+        response=HttpResponseBytes(content=b""),
+        error=ResourceException(message="boom", status_code=418, details={}),
+    )
+    linked_service = LinkedService(http=http)
+    props = HttpDatasetTypedProperties(url="https://example.test/data")
+    dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    linked_service.connect()
+    with pytest.raises(ReadError) as exc_info:
+        dataset.read()
+    assert exc_info.value.status_code == 418
+    assert exc_info.value.details["type"] == ResourceKind.DATASET.value
+
+
+def test_create_wraps_resource_exception_into_write_error() -> None:
+    """
+    It wraps a provider ResourceException into WriteError and includes dataset type in details.
+    """
+    http = HttpClient(
+        response=HttpResponseBytes(content=b""),
+        error=ResourceException(message="boom", status_code=418, details={}),
+    )
+    linked_service = LinkedService(http=http)
+    props = HttpDatasetTypedProperties(url="https://example.test/data", method="POST")
+    dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    linked_service.connect()
+    with pytest.raises(WriteError) as exc_info:
+        dataset.create()
+    assert exc_info.value.status_code == 418
+    assert exc_info.value.details["type"] == ResourceKind.DATASET.value
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        AuthenticationError(message="no", details={}),
+        AuthorizationError(message="no", details={}),
+        ConnectionError(message="no", details={}),
+    ],
+)
+def test_dataset_propagates_authz_and_connection_errors(exc: Exception) -> None:
+    """
+    It re-raises auth/authorization/connection errors directly.
+    """
+    http = HttpClient(response=HttpResponseBytes(content=b""), error=exc)
+    linked_service = LinkedService(http=http)
+    props = HttpDatasetTypedProperties(url="https://example.test/data")
+    dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    linked_service.connect()
+    with pytest.raises(type(exc)):
+        dataset.read()
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        AuthenticationError(message="no", details={}),
+        AuthorizationError(message="no", details={}),
+        ConnectionError(message="no", details={}),
+    ],
+)
+def test_dataset_create_propagates_authz_and_connection_errors(exc: Exception) -> None:
+    """
+    It re-raises auth/authorization/connection errors directly (create path).
+    """
+    http = HttpClient(response=HttpResponseBytes(content=b""), error=exc)
+    linked_service = LinkedService(http=http)
+    props = HttpDatasetTypedProperties(url="https://example.test/data", method="POST")
+    dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    linked_service.connect()
+    with pytest.raises(type(exc)):
+        dataset.create()
+
+
+def test_dataset_unimplemented_methods_raise() -> None:
+    """
+    It raises NotImplementedError for delete/update/rename.
+    """
+    http = HttpClient(response=HttpResponseBytes(content=b""))
+    linked_service = LinkedService(http=http)
+    props = HttpDatasetTypedProperties(url="https://example.test/data")
+    dataset = HttpDataset(linked_service=cast("Any", linked_service), typed_properties=props)
+    with pytest.raises(NotImplementedError):
+        dataset.delete()
+    with pytest.raises(NotImplementedError):
+        dataset.update()
+    with pytest.raises(NotImplementedError):
+        dataset.rename()
+
+
+def test_set_schema_populates_schema_from_dataframe() -> None:
+    """
+    It derives a string schema mapping from the dataframe columns/dtypes.
+    """
+    props = HttpDatasetTypedProperties(url="https://example.test/data")
+    dataset = HttpDataset(
+        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))),
+        typed_properties=props,
+    )
+    df = pd.DataFrame(
+        {
+            "a": [1, 2, 3],
+            "b": ["x", "y", "z"],
+            "c": [True, False, True],
+        }
+    )
+    dataset._set_schema(df)
+    assert set(dataset.schema.keys()) == {"a", "b", "c"}
+    assert all(isinstance(v, str) and v for v in dataset.schema.values())

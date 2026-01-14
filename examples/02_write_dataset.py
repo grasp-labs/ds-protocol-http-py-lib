@@ -2,12 +2,14 @@
 **File:** ``02_write_dataset.py``
 **Region:** ``examples/02_write_dataset``
 
-Example 02: Write to a dataset over HTTP (POST) using ds-protocol-http-py-lib.
+Example 02: Write a dataset over HTTP (POST) using ds-protocol-http-py-lib.
 """
 
 from __future__ import annotations
 
+import pandas as pd
 from ds_common_logger_py_lib import Logger
+from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetTypedProperties
 from ds_protocol_http_py_lib.linked_service.http import (
@@ -19,38 +21,37 @@ Logger()
 logger = Logger.get_logger(__name__)
 
 
-def main() -> None:
+def main() -> pd.DataFrame:
+    linked_service = HttpLinkedService(
+        typed_properties=HttpLinkedServiceTypedProperties(
+            host="",
+            auth_type="OAuth2",
+            headers={"Content-Type": "application/json"},
+            client_id="",
+            client_secret="",
+            token_endpoint="",
+        ),
+    )
+
+    dataset = HttpDataset(
+        linked_service=linked_service,
+        typed_properties=HttpDatasetTypedProperties(
+            method="POST",
+            url="",
+        ),
+    )
+
     try:
-        host = "https://api.example.com"
-        url = f"{host}/v1/items"
-
-        linked_service = HttpLinkedService(
-            typed_properties=HttpLinkedServiceTypedProperties(
-                host=host,
-                auth_type="NoAuth",
-            ),
-        )
-
-        dataset = HttpDataset(
-            linked_service=linked_service,
-            typed_properties=HttpDatasetTypedProperties(
-                method="POST",
-                url=url,
-                json={"hello": "world"},
-            ),
-        )
-
-        logger.info("Built HttpDataset (write)")
-        logger.info("base_uri=%s", linked_service.base_uri)
-        logger.info("url=%s", dataset.typed_properties.url)
-        logger.info("method=%s", dataset.typed_properties.method)
-        logger.info("json=%s", dataset.typed_properties.json)
+        dataset.linked_service.connect()
         dataset.create()
-        logger.info("Create complete")
-        logger.info("content=%s", dataset.content)
-    except Exception as exc:
-        logger.exception("Write failed: %s", exc)
+        logger.info("Dataset next: %s", dataset.next)
+        logger.info("Schema: %s", dataset.schema)
+        return dataset.content
+    except ResourceException as exc:
+        logger.error(f"Error reading dataset: {exc.__dict__}")
+        return pd.DataFrame()
 
 
 if __name__ == "__main__":
-    main()
+    df = main()
+    logger.info(df)

@@ -17,10 +17,13 @@ import base64
 from typing import Any, cast
 
 import pytest
-from ds_resource_plugin_py_lib.common.resource.linked_service.errors import AuthenticationError
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
+    AuthenticationError,
+    LinkedServiceException,
+)
 
 from ds_protocol_http_py_lib.linked_service.http import HttpLinkedService, HttpLinkedServiceTypedProperties
-from tests.mocks import JsonResponse, LinkedServiceHttp, http_error
+from tests.mocks import LinkedServiceHttp, json_response
 
 
 def test_post_init_builds_base_uri_from_schema_and_host() -> None:
@@ -53,22 +56,43 @@ def test_post_init_with_port_uses_host_and_port() -> None:
     assert service.base_uri == "api.example.test:8443"
 
 
+def test_connect_initializes_http_when_missing() -> None:
+    """
+    It (re)initializes the internal Http client if _http is None.
+    """
+    props = HttpLinkedServiceTypedProperties(host="api.example.test", auth_type="NoAuth")
+    service = HttpLinkedService(typed_properties=props)
+    service._http = None
+    http = service.connect()
+    assert http is not None
+
+
+def test_connect_raises_for_unsupported_auth_type() -> None:
+    """
+    It raises LinkedServiceException for unknown auth_type values.
+    """
+    props = HttpLinkedServiceTypedProperties(host="api.example.test", auth_type=cast("Any", "WeirdAuth"))
+    service = HttpLinkedService(typed_properties=props)
+    with pytest.raises(LinkedServiceException):
+        service.connect()
+
+
 def test_fetch_user_token_requires_token_endpoint() -> None:
     """
-    It raises ValueError when token_endpoint is missing.
+    It raises LinkedServiceException when token_endpoint is missing.
     """
 
     props = HttpLinkedServiceTypedProperties(host="api.example.test", auth_type="Bearer", token_endpoint=None)
     service = HttpLinkedService(typed_properties=props)
     http = service._http
     assert http is not None
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service._fetch_user_token(http)
 
 
 def test_fetch_user_token_raises_authentication_exception_on_http_error() -> None:
     """
-    It wraps HTTPError into AuthenticationError with response details.
+    It propagates AuthenticationError raised by the underlying HTTP client.
     """
 
     props = HttpLinkedServiceTypedProperties(
@@ -79,10 +103,18 @@ def test_fetch_user_token_raises_authentication_exception_on_http_error() -> Non
         password_key_value="p",
     )
     service = HttpLinkedService(typed_properties=props)
-    fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_error=http_error(401, "nope"))
-    with pytest.raises(AuthenticationError) as exc_info:
+    fake_http = LinkedServiceHttp(
+        session=type("S", (), {"headers": {}})(),
+        post_error=AuthenticationError(
+            message="Authentication error: boom",
+            details={
+                "url": props.token_endpoint,
+                "method": "POST",
+            },
+        ),
+    )
+    with pytest.raises(AuthenticationError):
         service._fetch_user_token(cast("Any", fake_http))
-    assert exc_info.value.details["http_status_code"] == 401
 
 
 def test_fetch_user_token_raises_authentication_exception_when_token_is_missing() -> None:
@@ -98,10 +130,20 @@ def test_fetch_user_token_raises_authentication_exception_when_token_is_missing(
         password_key_value="p",
     )
     service = HttpLinkedService(typed_properties=props)
-    fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_response=JsonResponse({"x": "y"}))
+    fake_http = LinkedServiceHttp(
+        session=type("S", (), {"headers": {}})(),
+        post_response=json_response(
+            {"x": "y"},
+            url="https://example.test/token",
+            method="POST",
+            reason="OK",
+        ),
+    )
     with pytest.raises(AuthenticationError) as exc_info:
         service._fetch_user_token(cast("Any", fake_http))
-    assert exc_info.value.details["error_type"] == "ValueError"
+    assert exc_info.value.details["url"] == "https://example.test/token"
+    assert exc_info.value.details["method"] == "POST"
+    assert "x" in str(exc_info.value.details["response_body"])
 
 
 def test_fetch_oauth2_token_extracts_token_from_json(token_payloads) -> None:
@@ -118,7 +160,7 @@ def test_fetch_oauth2_token_extracts_token_from_json(token_payloads) -> None:
         scope="s",
     )
     service = HttpLinkedService(typed_properties=props)
-    response = JsonResponse(token_payloads["flat_accessToken"])
+    response = json_response(token_payloads["flat_accessToken"], url="https://example.test/token", method="POST")
     fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_response=response)
     token = service._fetch_oauth2_token(cast("Any", fake_http))
     assert token == "t2"
@@ -126,7 +168,7 @@ def test_fetch_oauth2_token_extracts_token_from_json(token_payloads) -> None:
 
 def test_fetch_oauth2_token_requires_token_endpoint() -> None:
     """
-    It raises ValueError when token_endpoint is missing.
+    It raises LinkedServiceException when token_endpoint is missing.
     """
 
     props = HttpLinkedServiceTypedProperties(
@@ -140,7 +182,7 @@ def test_fetch_oauth2_token_requires_token_endpoint() -> None:
     service = HttpLinkedService(typed_properties=props)
     http = service._http
     assert http is not None
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service._fetch_oauth2_token(http)
 
 
@@ -158,10 +200,15 @@ def test_fetch_oauth2_token_raises_authentication_exception_when_token_is_missin
         scope="s",
     )
     service = HttpLinkedService(typed_properties=props)
-    fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), post_response=JsonResponse({"x": "y"}))
+    fake_http = LinkedServiceHttp(
+        session=type("S", (), {"headers": {}})(),
+        post_response=json_response({"x": "y"}, url="https://example.test/token", method="POST"),
+    )
     with pytest.raises(AuthenticationError) as exc_info:
         service._fetch_oauth2_token(cast("Any", fake_http))
-    assert exc_info.value.details["error_type"] == "ValueError"
+    assert exc_info.value.details["url"] == "https://example.test/token"
+    assert exc_info.value.details["method"] == "POST"
+    assert "x" in str(exc_info.value.details["response_body"])
 
 
 def test_connect_apikey_updates_session_headers() -> None:
@@ -177,13 +224,14 @@ def test_connect_apikey_updates_session_headers() -> None:
     )
     service = HttpLinkedService(typed_properties=props)
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     assert http.session.headers["X-API-Key"] == "k"
-    assert service._auth_configured is True
 
 
 def test_connect_apikey_requires_name_and_value() -> None:
     """
-    It raises ValueError when API key name or value is missing.
+    It raises LinkedServiceException when API key name or value is missing.
     """
 
     props_missing_name = HttpLinkedServiceTypedProperties(
@@ -193,7 +241,7 @@ def test_connect_apikey_requires_name_and_value() -> None:
         api_key_value="k",
     )
     service_missing_name = HttpLinkedService(typed_properties=props_missing_name)
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service_missing_name.connect()
 
     props_missing_value = HttpLinkedServiceTypedProperties(
@@ -203,7 +251,7 @@ def test_connect_apikey_requires_name_and_value() -> None:
         api_key_value=None,
     )
     service_missing_value = HttpLinkedService(typed_properties=props_missing_value)
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service_missing_value.connect()
 
 
@@ -220,6 +268,8 @@ def test_connect_basic_sets_authorization_header() -> None:
     )
     service = HttpLinkedService(typed_properties=props)
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     header = str(http.session.headers["Authorization"])
     assert header.startswith("Basic ")
     encoded = header.split(" ", 1)[1].strip()
@@ -228,7 +278,7 @@ def test_connect_basic_sets_authorization_header() -> None:
 
 def test_connect_basic_requires_username_and_password() -> None:
     """
-    It raises ValueError when Basic credentials are missing.
+    It raises LinkedServiceException when Basic credentials are missing.
     """
 
     props_missing_user = HttpLinkedServiceTypedProperties(
@@ -238,7 +288,7 @@ def test_connect_basic_requires_username_and_password() -> None:
         password_key_value="p",
     )
     service_missing_user = HttpLinkedService(typed_properties=props_missing_user)
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service_missing_user.connect()
 
     props_missing_pass = HttpLinkedServiceTypedProperties(
@@ -248,7 +298,7 @@ def test_connect_basic_requires_username_and_password() -> None:
         password_key_value=None,
     )
     service_missing_pass = HttpLinkedService(typed_properties=props_missing_pass)
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service_missing_pass.connect()
 
 
@@ -265,6 +315,8 @@ def test_connect_bearer_sets_authorization_header(monkeypatch: pytest.MonkeyPatc
     service = HttpLinkedService(typed_properties=props)
     monkeypatch.setattr(service, "_fetch_user_token", lambda http: "bt")
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     assert http.session.headers["Authorization"] == "Bearer bt"
 
 
@@ -284,17 +336,19 @@ def test_connect_oauth2_sets_authorization_header(monkeypatch: pytest.MonkeyPatc
     service = HttpLinkedService(typed_properties=props)
     monkeypatch.setattr(service, "_fetch_oauth2_token", lambda http: "ot")
     http = service.connect()
+    assert service.connection is http
+    assert service._http is http
     assert http.session.headers["Authorization"] == "Bearer ot"
 
 
 def test_connect_custom_requires_token_endpoint() -> None:
     """
-    It raises ValueError when Custom auth is configured without token endpoint.
+    It raises LinkedServiceException when Custom auth is configured without token endpoint.
     """
 
     props = HttpLinkedServiceTypedProperties(host="api.example.test", auth_type="Custom", token_endpoint=None)
     service = HttpLinkedService(typed_properties=props)
-    with pytest.raises(ValueError):
+    with pytest.raises(LinkedServiceException):
         service.connect()
 
 
@@ -312,14 +366,21 @@ def test_connect_custom_sets_bearer_authorization_header(token_payloads) -> None
     )
     service = HttpLinkedService(typed_properties=props)
     fake_session = type("S", (), {"headers": {}})()
-    service._http = cast("Any", LinkedServiceHttp(session=fake_session, post_response=JsonResponse(token_payloads["flat_token"])))
+    service._http = cast(
+        "Any",
+        LinkedServiceHttp(
+            session=fake_session,
+            post_response=json_response(token_payloads["flat_token"], url="https://example.test/token", method="POST"),
+        ),
+    )
     http = service.connect()
+    assert service.connection is http
     assert http.session.headers["Authorization"] == "Bearer t3"
 
 
 def test_connect_custom_raises_when_access_token_is_missing() -> None:
     """
-    It raises ValueError when the token endpoint response does not include a token.
+    It raises AuthenticationError when the token endpoint response does not include a token.
     """
 
     props = HttpLinkedServiceTypedProperties(
@@ -331,9 +392,17 @@ def test_connect_custom_raises_when_access_token_is_missing() -> None:
     )
     service = HttpLinkedService(typed_properties=props)
     fake_session = type("S", (), {"headers": {}})()
-    service._http = cast("Any", LinkedServiceHttp(session=fake_session, post_response=JsonResponse({"x": "y"})))
-    with pytest.raises(ValueError):
+    service._http = cast(
+        "Any",
+        LinkedServiceHttp(
+            session=fake_session,
+            post_response=json_response({"x": "y"}, url="https://example.test/token", method="POST"),
+        ),
+    )
+    with pytest.raises(AuthenticationError) as exc_info:
         service.connect()
+    assert exc_info.value.details["url"] == "https://example.test/token"
+    assert exc_info.value.details["method"] == "POST"
 
 
 def test_connect_noauth_only_merges_headers() -> None:
@@ -387,15 +456,3 @@ def test_test_connection_returns_true_on_success() -> None:
     ok, message = service.test_connection()
     assert ok is True
     assert "successfully" in message
-
-
-def test_connect_raises_when_http_is_not_initialized() -> None:
-    """
-    It raises RuntimeError if the internal Http client is missing.
-    """
-
-    props = HttpLinkedServiceTypedProperties(host="api.example.test", auth_type="NoAuth")
-    service = HttpLinkedService(typed_properties=props)
-    service._http = None
-    with pytest.raises(RuntimeError):
-        service.connect()

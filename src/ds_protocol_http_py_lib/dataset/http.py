@@ -34,7 +34,14 @@ from ds_resource_plugin_py_lib.common.resource.dataset import (
     DatasetTypedProperties,
     TabularDataset,
 )
+from ds_resource_plugin_py_lib.common.resource.dataset.errors import (
+    ReadError,
+    WriteError,
+)
+from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
+    AuthenticationError,
+    AuthorizationError,
     ConnectionError,
 )
 from ds_resource_plugin_py_lib.common.serde.deserialize import (
@@ -48,7 +55,6 @@ from ds_resource_plugin_py_lib.common.serde.serialize import (
 
 from ..enums import ResourceKind
 from ..linked_service.http import HttpLinkedService
-from ..utils.http.provider import Http
 
 
 @dataclass(kw_only=True)
@@ -92,11 +98,6 @@ class HttpDataset(
     deserializer: DataDeserializer | None = field(
         default_factory=lambda: PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
-    connection: Http | None = field(default=None, init=False)
-
-    def __post_init__(self) -> None:
-        if self.linked_service is not None:
-            self.connection = self.linked_service.connect()
 
     @property
     def kind(self) -> ResourceKind:
@@ -108,29 +109,42 @@ class HttpDataset(
 
         Args:
             kwargs: Additional keyword arguments to pass to the request.
+
+        Raises:
+            AuthenticationError: If the authentication fails.
+            AuthorizationError: If the authorization fails.
+            ConnectionError: If the connection fails.
+            WriteError: If the write error occurs.
         """
-        if self.connection is None:
-            raise ConnectionError(
-                message="Connection is not initialized.",
-                code="NOT_INITIALIZED",
-                status_code=503,
-            )
+        if self.linked_service.connection is None:
+            raise ConnectionError(message="Connection is not initialized.")
 
         self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
 
-        response = self.connection.request(
-            method=self.typed_properties.method,
-            url=self.typed_properties.url,
-            data=self.typed_properties.data,
-            json=self.typed_properties.json,
-            files=self.typed_properties.files,
-            params=self.typed_properties.params,
-            headers=self.typed_properties.headers,
-            **kwargs,
-        )
+        try:
+            response = self.linked_service.connection.request(
+                method=self.typed_properties.method,
+                url=self.typed_properties.url,
+                data=self.typed_properties.data,
+                json=self.typed_properties.json,
+                files=self.typed_properties.files,
+                params=self.typed_properties.params,
+                headers=self.typed_properties.headers,
+                **kwargs,
+            )
+        except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
+            raise exc
+        except ResourceException as exc:
+            exc.details.update({"type": self.kind.value})
+            raise WriteError(
+                message=exc.message,
+                status_code=exc.status_code,
+                details=exc.details,
+            ) from exc
 
         if response.content and self.deserializer:
             self.content = self.deserializer(response.content)
+            self._set_schema(self.content)
         else:
             self.content = pd.DataFrame()
 
@@ -140,25 +154,42 @@ class HttpDataset(
 
         Args:
             kwargs: Additional keyword arguments to pass to the request.
+
+        Raises:
+            AuthenticationError: If the authentication fails.
+            AuthorizationError: If the authorization fails.
+            ConnectionError: If the connection fails.
+            ReadError: If the read error occurs.
         """
-        if self.connection is None:
+        if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
         self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
 
-        response = self.connection.request(
-            method=self.typed_properties.method,
-            url=self.typed_properties.url,
-            data=self.typed_properties.data,
-            json=self.typed_properties.json,
-            files=self.typed_properties.files,
-            params=self.typed_properties.params,
-            headers=self.typed_properties.headers,
-            **kwargs,
-        )
+        try:
+            response = self.linked_service.connection.request(
+                method=self.typed_properties.method,
+                url=self.typed_properties.url,
+                data=self.typed_properties.data,
+                json=self.typed_properties.json,
+                files=self.typed_properties.files,
+                params=self.typed_properties.params,
+                headers=self.typed_properties.headers,
+                **kwargs,
+            )
+        except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
+            raise exc
+        except ResourceException as exc:
+            exc.details.update({"type": self.kind.value})
+            raise ReadError(
+                message=exc.message,
+                status_code=exc.status_code,
+                details=exc.details,
+            ) from exc
 
         if response.content and self.deserializer:
             self.content = self.deserializer(response.content)
+            self._set_schema(self.content)
             self.next = self.deserializer.get_next(response.content)
             if self.next:
                 self.cursor = self.deserializer.get_end_cursor(response.content)
@@ -175,3 +206,12 @@ class HttpDataset(
 
     def rename(self, **kwargs: Any) -> NoReturn:
         raise NotImplementedError("Rename operation is not supported for Http datasets")
+
+    def _set_schema(self, content: pd.DataFrame) -> None:
+        """
+        Set the schema from the content.
+
+        Args:
+            content: The content to set the schema from.
+        """
+        self.schema = {col: str(dtype) for col, dtype in content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()}

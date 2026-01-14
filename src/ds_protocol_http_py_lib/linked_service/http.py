@@ -26,8 +26,8 @@ from ds_resource_plugin_py_lib.common.resource.linked_service import (
 )
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
+    LinkedServiceException,
 )
-from requests import HTTPError
 
 from .. import PACKAGE_NAME, __version__
 from ..enums import ResourceKind
@@ -84,8 +84,9 @@ class HttpLinkedService(
     """
 
     typed_properties: HttpLinkedServiceTypedPropertiesType
+
+    connection: Http | None = field(default=None, init=False)
     _http: Http | None = field(default=None, init=False)
-    _auth_configured: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.base_uri = (
@@ -148,6 +149,10 @@ class HttpLinkedService(
 
         Returns:
             str: The user token.
+
+        Raises:
+            LinkedServiceException: If the token endpoint is missing.
+            AuthenticationError: If the token is missing in the response.
         """
         url = self.typed_properties.token_endpoint
         headers = {"Content-type": "application/json"}
@@ -156,34 +161,29 @@ class HttpLinkedService(
             self.typed_properties.password_key_name: self.typed_properties.password_key_value,
         }
         if not url:
-            raise ValueError("Token endpoint is missing in the linked service properties")
-
-        try:
-            response = http.post(
-                url=url,
-                headers=headers,
-                json=data,
-                timeout=30,
+            raise LinkedServiceException(
+                message="Token endpoint is missing in the linked service properties",
+                details={"type": self.kind.value},
             )
-            token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
-            if token is None:
-                raise ValueError("Token not found in response")
-        except HTTPError as exc:
+
+        response = http.post(
+            url=url,
+            headers=headers,
+            json=data,
+            timeout=30,
+        )
+        token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
+        if token is None:
             raise AuthenticationError(
-                message=f"Authentication error: {exc}",
+                message="Token is missing in the response from the token endpoint",
                 details={
-                    "http_status_code": exc.response.status_code,
-                    "http_response_body": exc.response.text,
+                    "type": self.kind.value,
+                    "response_body": response.text,
+                    "reason": response.reason,
+                    "url": response.url,
+                    "method": response.request.method,
                 },
-            ) from exc
-        except Exception as exc:
-            raise AuthenticationError(
-                message=f"Authentication error: {exc}",
-                details={
-                    "error_type": type(exc).__name__,
-                    "error_message": str(exc),
-                },
-            ) from exc
+            )
 
         return token
 
@@ -196,6 +196,10 @@ class HttpLinkedService(
 
         Returns:
             str: The OAuth2 token.
+
+        Raises:
+            LinkedServiceException: If the token endpoint is missing.
+            AuthenticationError: If the token is missing in the response.
         """
         url = self.typed_properties.token_endpoint
         headers = {"Content-type": "application/x-www-form-urlencoded"}
@@ -206,34 +210,29 @@ class HttpLinkedService(
             "grant_type": "client_credentials",
         }
         if not url:
-            raise ValueError("Token endpoint is missing in the linked service properties")
-
-        try:
-            response = http.post(
-                url=url,
-                headers=headers,
-                data=data,
-                timeout=30,
+            raise LinkedServiceException(
+                message="Token endpoint is missing in the linked service properties",
+                details={"type": self.kind.value},
             )
-            token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
-            if token is None:
-                raise ValueError("Token not found in response")
-        except HTTPError as exc:
+
+        response = http.post(
+            url=url,
+            headers=headers,
+            data=data,
+            timeout=30,
+        )
+        token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
+        if token is None:
             raise AuthenticationError(
-                message=f"Authentication error: {exc}",
+                message="Token is missing in the response from the token endpoint",
                 details={
-                    "http_status_code": exc.response.status_code,
-                    "http_response_body": exc.response.text,
+                    "type": self.kind.value,
+                    "response_body": response.text,
+                    "reason": response.reason,
+                    "url": response.url,
+                    "method": response.request.method,
                 },
-            ) from exc
-        except Exception as exc:
-            raise AuthenticationError(
-                message=f"Authentication error: {exc}",
-                details={
-                    "error_type": type(exc).__name__,
-                    "error_message": str(exc),
-                },
-            ) from exc
+            )
 
         return token
 
@@ -275,14 +274,20 @@ class HttpLinkedService(
             http: The Http client instance to configure.
 
         Raises:
-            ValueError: If username or password is missing.
+            LinkedServiceException: If username or password is missing.
         """
         username = self.typed_properties.username_key_value
         password = self.typed_properties.password_key_value
         if not username:
-            raise ValueError("Basic auth username is missing in the linked service")
+            raise LinkedServiceException(
+                message="Basic auth username is missing in the linked service",
+                details={"type": self.kind.value},
+            )
         if not password:
-            raise ValueError("Basic auth password is missing in the linked service")
+            raise LinkedServiceException(
+                message="Basic auth password is missing in the linked service",
+                details={"type": self.kind.value},
+            )
         token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
         http.session.headers.update({"Authorization": f"Basic {token}"})
 
@@ -296,12 +301,18 @@ class HttpLinkedService(
             http: The Http client instance to configure.
 
         Raises:
-            ValueError: If API key name or value is missing.
+            LinkedServiceException: If API key name or value is missing.
         """
         if not self.typed_properties.api_key_name:
-            raise ValueError("API key name is missing in the linked service")
+            raise LinkedServiceException(
+                message="API key name is missing in the linked service",
+                details={"type": self.kind.value},
+            )
         if not self.typed_properties.api_key_value:
-            raise ValueError("API key value is missing in the linked service")
+            raise LinkedServiceException(
+                message="API key value is missing in the linked service",
+                details={"type": self.kind.value},
+            )
         http.session.headers.update({self.typed_properties.api_key_name: self.typed_properties.api_key_value})
 
     def _configure_custom_auth(self, http: Http) -> None:
@@ -316,28 +327,35 @@ class HttpLinkedService(
             http: The Http client instance to configure.
 
         Raises:
-            ValueError: If token endpoint is missing or the token cannot be found.
+            AuthenticationError: If the token is missing in the response.
+            LinkedServiceException: If token endpoint is missing or the token cannot be found.
         """
         if not self.typed_properties.token_endpoint:
-            raise ValueError("Token endpoint is missing in the linked service properties")
+            raise LinkedServiceException(
+                message="Token endpoint is missing in the linked service properties",
+                details={"type": self.kind.value},
+            )
+
         response = http.post(
             url=self.typed_properties.token_endpoint,
             headers=self.typed_properties.headers,
             json=self.typed_properties.data,
             timeout=30,
         )
+        token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
+        if token is None:
+            raise AuthenticationError(
+                message="Token is missing in the response from the token endpoint",
+                details={
+                    "type": self.kind.value,
+                    "response_body": response.text,
+                    "reason": response.reason,
+                    "url": response.url,
+                    "method": response.request.method,
+                },
+            )
 
-        access_token = find_keys_in_json(
-            response.json(),
-            {
-                "access_token",
-                "accessToken",
-                "token",
-            },
-        )
-        if not access_token:
-            raise ValueError("Access token is missing in the response from the token endpoint")
-        http.session.headers.update({"Authorization": f"Bearer {access_token}"})
+        http.session.headers.update({"Authorization": f"Bearer {token}"})
 
     def _configure_noauth(self, _http: Http) -> None:
         """
@@ -353,16 +371,21 @@ class HttpLinkedService(
 
     def connect(self) -> Http:
         """
-        Connect to the REST API and configure authentication.
+        Connect to the HTTP API and configure authentication.
+
+        Initializes the Http client instance if not already initialized.
+        Configures authentication based on the auth_type.
+        Updates the session headers with the configured headers.
 
         Returns:
             Http: The Http client instance with authentication configured.
+
+        Raises:
+            AuthenticationError: If the authentication fails.
+            LinkedServiceException: If the auth_type is unsupported.
         """
         if self._http is None:
-            raise RuntimeError("Http instance not initialized. This should not happen.")
-
-        if self._auth_configured:
-            return self._http
+            self._http = self._init_http()
 
         handlers = {
             "Bearer": self._configure_bearer_auth,
@@ -376,13 +399,21 @@ class HttpLinkedService(
         try:
             handlers[self.typed_properties.auth_type](self._http)
         except KeyError as exc:
-            raise ValueError(f"Unsupported auth_type: {self.typed_properties.auth_type}") from exc
+            raise LinkedServiceException(
+                message=f"Unsupported auth_type: {self.typed_properties.auth_type}",
+                details={
+                    "type": self.kind.value,
+                    "auth_type": self.typed_properties.auth_type,
+                    "error_type": type(exc).__name__,
+                    "valid_auth_types": list(handlers.keys()),
+                },
+            ) from exc
 
         if self.typed_properties.headers:
             self._http.session.headers.update(self.typed_properties.headers)
 
-        self._auth_configured = True
-        return self._http
+        self.connection = self._http
+        return self.connection
 
     def test_connection(self) -> tuple[bool, str]:
         """
