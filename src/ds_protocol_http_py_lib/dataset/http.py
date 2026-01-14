@@ -44,14 +44,8 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthorizationError,
     ConnectionError,
 )
-from ds_resource_plugin_py_lib.common.serde.deserialize import (
-    DataDeserializer,
-    PandasDeserializer,
-)
-from ds_resource_plugin_py_lib.common.serde.serialize import (
-    DataSerializer,
-    PandasSerializer,
-)
+from ds_resource_plugin_py_lib.common.serde.deserialize import PandasDeserializer
+from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 
 from ..enums import ResourceKind
 from ..linked_service.http import HttpLinkedService
@@ -84,18 +78,18 @@ class HttpDataset(
     TabularDataset[
         HttpLinkedServiceType,
         HttpDatasetTypedPropertiesType,
-        DataSerializer,
-        DataDeserializer,
+        PandasSerializer,
+        PandasDeserializer,
     ],
     Generic[HttpLinkedServiceType, HttpDatasetTypedPropertiesType],
 ):
     linked_service: HttpLinkedServiceType
     typed_properties: HttpDatasetTypedPropertiesType
 
-    serializer: DataSerializer | None = field(
+    serializer: PandasSerializer | None = field(
         default_factory=lambda: PandasSerializer(format=DatasetStorageFormatType.JSON),
     )
-    deserializer: DataDeserializer | None = field(
+    deserializer: PandasDeserializer | None = field(
         default_factory=lambda: PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
 

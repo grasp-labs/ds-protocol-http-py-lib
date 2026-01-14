@@ -466,7 +466,7 @@ wheels = [
 
 [[package]]
 name = "ds-protocol-http-py-lib"
-version = "0.1.0a3"
+version = "0.1.0a4"
 source = { editable = "." }
 dependencies = [
     { name = "ds-resource-plugin-py-lib" },
