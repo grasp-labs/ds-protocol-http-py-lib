@@ -10,24 +10,24 @@ Example:
     >>> dataset = HttpDataset(
     ...     deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
     ...     serializer=PandasSerializer(format=DatasetStorageFormatType.JSON),
-    ...     typed_properties=HttpDatasetTypedProperties(
+    ...     settings=HttpDatasetSettings(
     ...         url="https://api.example.com/data",
     ...         method="GET",
     ...     ),
     ...     linked_service=HttpLinkedService(
-    ...         typed_properties=HttpLinkedServiceTypedProperties(
+    ...         settings=HttpLinkedServiceSettings(
     ...             host="https://api.example.com",
     ...             auth_type="OAuth2",
     ...         ),
     ...     ),
     ... )
     >>> dataset.read()
-    >>> data = dataset.content
+    >>> data = dataset.output
 """
 
-from .http import HttpDataset, HttpDatasetTypedProperties
+from .http import HttpDataset, HttpDatasetSettings
 
 __all__ = [
     "HttpDataset",
-    "HttpDatasetTypedProperties",
+    "HttpDatasetSettings",
 ]
