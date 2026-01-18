@@ -8,7 +8,7 @@ This module implements a linked service for HTTP APIs.
 
 Example:
     >>> linked_service = HttpLinkedService(
-    ...     typed_properties=HttpLinkedServiceTypedProperties(
+    ...     settings=HttpLinkedServiceSettings(
     ...         host="https://api.example.com",
     ...         auth_type="OAuth2",
     ...     ),
@@ -22,7 +22,7 @@ from typing import Generic, Literal, TypeVar
 
 from ds_resource_plugin_py_lib.common.resource.linked_service import (
     LinkedService,
-    LinkedServiceTypedProperties,
+    LinkedServiceSettings,
 )
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
@@ -38,9 +38,9 @@ from ..utils.http.token_bucket import TokenBucket
 
 
 @dataclass(kw_only=True)
-class HttpLinkedServiceTypedProperties(LinkedServiceTypedProperties):
+class HttpLinkedServiceSettings(LinkedServiceSettings):
     """
-    The object containing the HTTP linked service properties.
+    The object containing the HTTP linked service settings.
     """
 
     host: str
@@ -68,35 +68,35 @@ class HttpLinkedServiceTypedProperties(LinkedServiceTypedProperties):
     data: dict[str, str] | None = None
 
 
-HttpLinkedServiceTypedPropertiesType = TypeVar(
-    "HttpLinkedServiceTypedPropertiesType",
-    bound=HttpLinkedServiceTypedProperties,
+HttpLinkedServiceSettingsType = TypeVar(
+    "HttpLinkedServiceSettingsType",
+    bound=HttpLinkedServiceSettings,
 )
 
 
 @dataclass(kw_only=True)
 class HttpLinkedService(
-    LinkedService[HttpLinkedServiceTypedPropertiesType],
-    Generic[HttpLinkedServiceTypedPropertiesType],
+    LinkedService[HttpLinkedServiceSettingsType],
+    Generic[HttpLinkedServiceSettingsType],
 ):
     """
     The class is used to connect with HTTP API.
     """
 
-    typed_properties: HttpLinkedServiceTypedPropertiesType
+    settings: HttpLinkedServiceSettingsType
 
     connection: Http | None = field(default=None, init=False)
     _http: Http | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         self.base_uri = (
-            self.typed_properties.host
-            if self.typed_properties.host and "://" in self.typed_properties.host
-            else f"{self.typed_properties.schema}://{self.typed_properties.host}"
+            self.settings.host
+            if self.settings.host and "://" in self.settings.host
+            else f"{self.settings.schema}://{self.settings.host}"
         )
 
-        if self.typed_properties.port:
-            self.base_uri = f"{self.typed_properties.host}:{self.typed_properties.port}"
+        if self.settings.port:
+            self.base_uri = f"{self.settings.host}:{self.settings.port}"
 
         self._http = self._init_http()
 
@@ -114,7 +114,7 @@ class HttpLinkedService(
         Initialize the Http client instance with HttpConfig and TokenBucket.
 
         Creates an Http instance with:
-        - HttpConfig using headers from the linked service properties
+        - HttpConfig using headers from the linked service settings
         - TokenBucket with rate limiting (10 requests per second, capacity of 20)
 
         Subclasses can override this method to customize the entire Http initialization,
@@ -132,7 +132,7 @@ class HttpLinkedService(
             respect_retry_after_header=True,
         )
         config = HttpConfig(
-            headers=dict(self.typed_properties.headers or {}),
+            headers=dict(self.settings.headers or {}),
             timeout_seconds=60,
             user_agent=f"{PACKAGE_NAME}/{__version__}",
             retry=retry_config,
@@ -154,15 +154,15 @@ class HttpLinkedService(
             LinkedServiceException: If the token endpoint is missing.
             AuthenticationError: If the token is missing in the response.
         """
-        url = self.typed_properties.token_endpoint
+        url = self.settings.token_endpoint
         headers = {"Content-type": "application/json"}
         data = {
-            self.typed_properties.username_key_name: self.typed_properties.username_key_value,
-            self.typed_properties.password_key_name: self.typed_properties.password_key_value,
+            self.settings.username_key_name: self.settings.username_key_value,
+            self.settings.password_key_name: self.settings.password_key_value,
         }
         if not url:
             raise LinkedServiceException(
-                message="Token endpoint is missing in the linked service properties",
+                message="Token endpoint is missing in the linked service settings",
                 details={"type": self.kind.value},
             )
 
@@ -201,17 +201,17 @@ class HttpLinkedService(
             LinkedServiceException: If the token endpoint is missing.
             AuthenticationError: If the token is missing in the response.
         """
-        url = self.typed_properties.token_endpoint
+        url = self.settings.token_endpoint
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         data = {
-            "client_id": self.typed_properties.client_id,
-            "client_secret": self.typed_properties.client_secret,
-            "scope": self.typed_properties.scope,
+            "client_id": self.settings.client_id,
+            "client_secret": self.settings.client_secret,
+            "scope": self.settings.scope,
             "grant_type": "client_credentials",
         }
         if not url:
             raise LinkedServiceException(
-                message="Token endpoint is missing in the linked service properties",
+                message="Token endpoint is missing in the linked service settings",
                 details={"type": self.kind.value},
             )
 
@@ -276,8 +276,8 @@ class HttpLinkedService(
         Raises:
             LinkedServiceException: If username or password is missing.
         """
-        username = self.typed_properties.username_key_value
-        password = self.typed_properties.password_key_value
+        username = self.settings.username_key_value
+        password = self.settings.password_key_value
         if not username:
             raise LinkedServiceException(
                 message="Basic auth username is missing in the linked service",
@@ -303,17 +303,17 @@ class HttpLinkedService(
         Raises:
             LinkedServiceException: If API key name or value is missing.
         """
-        if not self.typed_properties.api_key_name:
+        if not self.settings.api_key_name:
             raise LinkedServiceException(
                 message="API key name is missing in the linked service",
                 details={"type": self.kind.value},
             )
-        if not self.typed_properties.api_key_value:
+        if not self.settings.api_key_value:
             raise LinkedServiceException(
                 message="API key value is missing in the linked service",
                 details={"type": self.kind.value},
             )
-        http.session.headers.update({self.typed_properties.api_key_name: self.typed_properties.api_key_value})
+        http.session.headers.update({self.settings.api_key_name: self.settings.api_key_value})
 
     def _configure_custom_auth(self, http: Http) -> None:
         """
@@ -330,16 +330,16 @@ class HttpLinkedService(
             AuthenticationError: If the token is missing in the response.
             LinkedServiceException: If token endpoint is missing or the token cannot be found.
         """
-        if not self.typed_properties.token_endpoint:
+        if not self.settings.token_endpoint:
             raise LinkedServiceException(
-                message="Token endpoint is missing in the linked service properties",
+                message="Token endpoint is missing in the linked service settings",
                 details={"type": self.kind.value},
             )
 
         response = http.post(
-            url=self.typed_properties.token_endpoint,
-            headers=self.typed_properties.headers,
-            json=self.typed_properties.data,
+            url=self.settings.token_endpoint,
+            headers=self.settings.headers,
+            json=self.settings.data,
             timeout=30,
         )
         token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
@@ -397,20 +397,20 @@ class HttpLinkedService(
         }
 
         try:
-            handlers[self.typed_properties.auth_type](self._http)
+            handlers[self.settings.auth_type](self._http)
         except KeyError as exc:
             raise LinkedServiceException(
-                message=f"Unsupported auth_type: {self.typed_properties.auth_type}",
+                message=f"Unsupported auth_type: {self.settings.auth_type}",
                 details={
                     "type": self.kind.value,
-                    "auth_type": self.typed_properties.auth_type,
+                    "auth_type": self.settings.auth_type,
                     "error_type": type(exc).__name__,
                     "valid_auth_types": list(handlers.keys()),
                 },
             ) from exc
 
-        if self.typed_properties.headers:
-            self._http.session.headers.update(self.typed_properties.headers)
+        if self.settings.headers:
+            self._http.session.headers.update(self.settings.headers)
 
         self.connection = self._http
         return self.connection
@@ -428,3 +428,10 @@ class HttpLinkedService(
             return True, "Connection successfully tested"
         except Exception as exc:
             return False, str(exc)
+
+    def close(self) -> None:
+        """
+        Close the linked service.
+        """
+        if self._http:
+            self._http.close()

@@ -8,7 +8,7 @@ This module implements a linked service for HTTP APIs.
 
 Example:
     >>> linked_service = HttpLinkedService(
-    ...     typed_properties=HttpLinkedServiceTypedProperties(
+    ...     settings=HttpLinkedServiceSettings(
     ...         host="https://api.example.com",
     ...         auth_type="OAuth2",
     ...         client_id="",
@@ -19,9 +19,9 @@ Example:
     >>> linked_service.connect()
 """
 
-from .http import HttpLinkedService, HttpLinkedServiceTypedProperties
+from .http import HttpLinkedService, HttpLinkedServiceSettings
 
 __all__ = [
     "HttpLinkedService",
-    "HttpLinkedServiceTypedProperties",
+    "HttpLinkedServiceSettings",
 ]

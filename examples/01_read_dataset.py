@@ -11,10 +11,10 @@ import pandas as pd
 from ds_common_logger_py_lib import Logger
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 
-from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetTypedProperties
+from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.linked_service.http import (
     HttpLinkedService,
-    HttpLinkedServiceTypedProperties,
+    HttpLinkedServiceSettings,
 )
 
 Logger()
@@ -23,7 +23,7 @@ logger = Logger.get_logger(__name__)
 
 def main() -> pd.DataFrame:
     linked_service = HttpLinkedService(
-        typed_properties=HttpLinkedServiceTypedProperties(
+        settings=HttpLinkedServiceSettings(
             host="",
             auth_type="OAuth2",
             headers={"Content-Type": "application/json"},
@@ -35,7 +35,7 @@ def main() -> pd.DataFrame:
 
     dataset = HttpDataset(
         linked_service=linked_service,
-        typed_properties=HttpDatasetTypedProperties(
+        settings=HttpDatasetSettings(
             method="GET",
             url="",
         ),
@@ -48,7 +48,7 @@ def main() -> pd.DataFrame:
             dataset.read()
             logger.info("Dataset next: %s", dataset.next)
             logger.info("Schema: %s", dataset.schema)
-            frames.append(dataset.content)
+            frames.append(dataset.output)
             break
     except ResourceException as exc:
         logger.error(f"Error reading dataset: {exc.__dict__}")

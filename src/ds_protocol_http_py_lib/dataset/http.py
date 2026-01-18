@@ -10,19 +10,19 @@ Example:
     >>> dataset = HttpDataset(
     ...     deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
     ...     serializer=PandasSerializer(format=DatasetStorageFormatType.JSON),
-    ...     typed_properties=HttpDatasetTypedProperties(
+    ...     settings=HttpDatasetSettings(
     ...         url="https://api.example.com/data",
     ...         method="GET",
     ...     ),
     ...     linked_service=HttpLinkedService(
-    ...         typed_properties=HttpLinkedServiceTypedProperties(
+    ...         settings=HttpLinkedServiceSettings(
     ...             host="https://api.example.com",
     ...             auth_type="OAuth2",
     ...         ),
     ...     ),
     ... )
     >>> dataset.read()
-    >>> data = dataset.content
+    >>> data = dataset.output
 """
 
 from dataclasses import dataclass, field
@@ -30,13 +30,13 @@ from typing import Any, Generic, Literal, NoReturn, TypeVar
 
 import pandas as pd
 from ds_resource_plugin_py_lib.common.resource.dataset import (
+    DatasetSettings,
     DatasetStorageFormatType,
-    DatasetTypedProperties,
     TabularDataset,
 )
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import (
+    CreateError,
     ReadError,
-    WriteError,
 )
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
@@ -52,7 +52,7 @@ from ..linked_service.http import HttpLinkedService
 
 
 @dataclass(kw_only=True)
-class HttpDatasetTypedProperties(DatasetTypedProperties):
+class HttpDatasetSettings(DatasetSettings):
     method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"] = "GET"
 
     url: str
@@ -63,9 +63,9 @@ class HttpDatasetTypedProperties(DatasetTypedProperties):
     headers: dict[str, Any] | None = None
 
 
-HttpDatasetTypedPropertiesType = TypeVar(
-    "HttpDatasetTypedPropertiesType",
-    bound=HttpDatasetTypedProperties,
+HttpDatasetSettingsType = TypeVar(
+    "HttpDatasetSettingsType",
+    bound=HttpDatasetSettings,
 )
 HttpLinkedServiceType = TypeVar(
     "HttpLinkedServiceType",
@@ -77,14 +77,14 @@ HttpLinkedServiceType = TypeVar(
 class HttpDataset(
     TabularDataset[
         HttpLinkedServiceType,
-        HttpDatasetTypedPropertiesType,
+        HttpDatasetSettingsType,
         PandasSerializer,
         PandasDeserializer,
     ],
-    Generic[HttpLinkedServiceType, HttpDatasetTypedPropertiesType],
+    Generic[HttpLinkedServiceType, HttpDatasetSettingsType],
 ):
     linked_service: HttpLinkedServiceType
-    typed_properties: HttpDatasetTypedPropertiesType
+    settings: HttpDatasetSettingsType
 
     serializer: PandasSerializer | None = field(
         default_factory=lambda: PandasSerializer(format=DatasetStorageFormatType.JSON),
@@ -108,39 +108,39 @@ class HttpDataset(
             AuthenticationError: If the authentication fails.
             AuthorizationError: If the authorization fails.
             ConnectionError: If the connection fails.
-            WriteError: If the write error occurs.
+            CreateError: If the create error occurs.
         """
         if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
-        self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
+        self.log.info(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
             response = self.linked_service.connection.request(
-                method=self.typed_properties.method,
-                url=self.typed_properties.url,
-                data=self.typed_properties.data,
-                json=self.typed_properties.json,
-                files=self.typed_properties.files,
-                params=self.typed_properties.params,
-                headers=self.typed_properties.headers,
+                method=self.settings.method,
+                url=self.settings.url,
+                data=self.settings.data,
+                json=self.settings.json,
+                files=self.settings.files,
+                params=self.settings.params,
+                headers=self.settings.headers,
                 **kwargs,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
         except ResourceException as exc:
             exc.details.update({"type": self.kind.value})
-            raise WriteError(
+            raise CreateError(
                 message=exc.message,
                 status_code=exc.status_code,
                 details=exc.details,
             ) from exc
 
         if response.content and self.deserializer:
-            self.content = self.deserializer(response.content)
-            self._set_schema(self.content)
+            self.output = self.deserializer(response.content)
+            self._set_schema(self.output)
         else:
-            self.content = pd.DataFrame()
+            self.output = pd.DataFrame()
 
     def read(self, **kwargs: Any) -> None:
         """
@@ -158,17 +158,17 @@ class HttpDataset(
         if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
-        self.log.info(f"Sending {self.typed_properties.method} request to {self.typed_properties.url}")
+        self.log.info(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
             response = self.linked_service.connection.request(
-                method=self.typed_properties.method,
-                url=self.typed_properties.url,
-                data=self.typed_properties.data,
-                json=self.typed_properties.json,
-                files=self.typed_properties.files,
-                params=self.typed_properties.params,
-                headers=self.typed_properties.headers,
+                method=self.settings.method,
+                url=self.settings.url,
+                data=self.settings.data,
+                json=self.settings.json,
+                files=self.settings.files,
+                params=self.settings.params,
+                headers=self.settings.headers,
                 **kwargs,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
@@ -182,15 +182,15 @@ class HttpDataset(
             ) from exc
 
         if response.content and self.deserializer:
-            self.content = self.deserializer(response.content)
-            self._set_schema(self.content)
+            self.output = self.deserializer(response.content)
+            self._set_schema(self.output)
             self.next = self.deserializer.get_next(response.content)
             if self.next:
                 self.cursor = self.deserializer.get_end_cursor(response.content)
         else:
             self.next = False
             self.cursor = None
-            self.content = pd.DataFrame()
+            self.output = pd.DataFrame()
 
     def delete(self, **kwargs: Any) -> NoReturn:
         raise NotImplementedError("Delete operation is not supported for Http datasets")
@@ -201,6 +201,12 @@ class HttpDataset(
     def rename(self, **kwargs: Any) -> NoReturn:
         raise NotImplementedError("Rename operation is not supported for Http datasets")
 
+    def close(self) -> None:
+        """
+        Close the dataset.
+        """
+        self.linked_service.close()
+
     def _set_schema(self, content: pd.DataFrame) -> None:
         """
         Set the schema from the content.
@@ -208,4 +214,6 @@ class HttpDataset(
         Args:
             content: The content to set the schema from.
         """
-        self.schema = {col: str(dtype) for col, dtype in content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()}
+        self.schema = {
+            str(col): str(dtype) for col, dtype in content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()
+        }

@@ -157,10 +157,14 @@ class LinkedService:
 
     http: HttpClient
     connection: HttpClient | None = None
+    closed: bool = False
 
     def connect(self) -> HttpClient:
         self.connection = self.http
         return self.connection
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class SerializerSpy:
@@ -208,6 +212,7 @@ class LinkedServiceHttp:
     post_error: Exception | None = None
     get_error: Exception | None = None
     get_response: Any | None = None
+    closed: bool = False
 
     def post(self, url: str, **kwargs: Any) -> Any:
         if self.post_error is not None:
@@ -218,6 +223,9 @@ class LinkedServiceHttp:
         if self.get_error is not None:
             raise self.get_error
         return self.get_response if self.get_response is not None else object()
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def http_error(
