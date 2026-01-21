@@ -26,19 +26,19 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 )
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
-from ds_protocol_http_py_lib.enums import ResourceKind
+from ds_protocol_http_py_lib.enums import ResourceType
 from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService
 
 
-def test_dataset_kind_is_dataset() -> None:
+def test_dataset_type_is_dataset() -> None:
     """
-    It exposes dataset kind.
+    It exposes dataset type.
     """
     props = HttpDatasetSettings(url="https://example.test/data")
     dataset = HttpDataset(
         linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))), settings=props
     )
-    assert dataset.kind == ResourceKind.DATASET
+    assert dataset.type == ResourceType.DATASET
 
 
 def test_create_raises_when_connection_is_missing() -> None:
@@ -201,7 +201,7 @@ def test_read_wraps_resource_exception_into_read_error() -> None:
     with pytest.raises(ReadError) as exc_info:
         dataset.read()
     assert exc_info.value.status_code == 418
-    assert exc_info.value.details["type"] == ResourceKind.DATASET.value
+    assert exc_info.value.details["type"] == ResourceType.DATASET.value
 
 
 def test_create_wraps_resource_exception_into_write_error() -> None:
@@ -219,7 +219,7 @@ def test_create_wraps_resource_exception_into_write_error() -> None:
     with pytest.raises(CreateError) as exc_info:
         dataset.create()
     assert exc_info.value.status_code == 418
-    assert exc_info.value.details["type"] == ResourceKind.DATASET.value
+    assert exc_info.value.details["type"] == ResourceType.DATASET.value
 
 
 @pytest.mark.parametrize(

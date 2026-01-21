@@ -5,16 +5,16 @@
 Constants for HTTP protocol.
 
 Example:
-    >>> ResourceKind.LINKED_SERVICE
+    >>> ResourceType.LINKED_SERVICE
     'DS.RESOURCE.LINKED_SERVICE.HTTP'
-    >>> ResourceKind.DATASET
+    >>> ResourceType.DATASET
     'DS.RESOURCE.DATASET.HTTP'
 """
 
 from enum import StrEnum
 
 
-class ResourceKind(StrEnum):
+class ResourceType(StrEnum):
     """
     Constants for HTTP protocol.
     """
