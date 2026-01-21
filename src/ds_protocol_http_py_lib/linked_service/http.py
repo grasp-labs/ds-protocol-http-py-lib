@@ -30,7 +30,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 )
 
 from .. import PACKAGE_NAME, __version__
-from ..enums import ResourceKind
+from ..enums import ResourceType
 from ..utils import find_keys_in_json
 from ..utils.http.config import HttpConfig, RetryConfig
 from ..utils.http.provider import Http
@@ -101,13 +101,13 @@ class HttpLinkedService(
         self._http = self._init_http()
 
     @property
-    def kind(self) -> ResourceKind:
+    def type(self) -> ResourceType:
         """
-        Get the kind of the linked service.
+        Get the type of the linked service.
         Returns:
-            ResourceKind
+            ResourceType
         """
-        return ResourceKind.LINKED_SERVICE
+        return ResourceType.LINKED_SERVICE
 
     def _init_http(self) -> Http:
         """
@@ -163,7 +163,7 @@ class HttpLinkedService(
         if not url:
             raise LinkedServiceException(
                 message="Token endpoint is missing in the linked service settings",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
 
         response = http.post(
@@ -177,7 +177,7 @@ class HttpLinkedService(
             raise AuthenticationError(
                 message="Token is missing in the response from the token endpoint",
                 details={
-                    "type": self.kind.value,
+                    "type": self.type.value,
                     "response_body": response.text,
                     "reason": response.reason,
                     "url": response.url,
@@ -212,7 +212,7 @@ class HttpLinkedService(
         if not url:
             raise LinkedServiceException(
                 message="Token endpoint is missing in the linked service settings",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
 
         response = http.post(
@@ -226,7 +226,7 @@ class HttpLinkedService(
             raise AuthenticationError(
                 message="Token is missing in the response from the token endpoint",
                 details={
-                    "type": self.kind.value,
+                    "type": self.type.value,
                     "response_body": response.text,
                     "reason": response.reason,
                     "url": response.url,
@@ -281,12 +281,12 @@ class HttpLinkedService(
         if not username:
             raise LinkedServiceException(
                 message="Basic auth username is missing in the linked service",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
         if not password:
             raise LinkedServiceException(
                 message="Basic auth password is missing in the linked service",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
         token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
         http.session.headers.update({"Authorization": f"Basic {token}"})
@@ -306,12 +306,12 @@ class HttpLinkedService(
         if not self.settings.api_key_name:
             raise LinkedServiceException(
                 message="API key name is missing in the linked service",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
         if not self.settings.api_key_value:
             raise LinkedServiceException(
                 message="API key value is missing in the linked service",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
         http.session.headers.update({self.settings.api_key_name: self.settings.api_key_value})
 
@@ -333,7 +333,7 @@ class HttpLinkedService(
         if not self.settings.token_endpoint:
             raise LinkedServiceException(
                 message="Token endpoint is missing in the linked service settings",
-                details={"type": self.kind.value},
+                details={"type": self.type.value},
             )
 
         response = http.post(
@@ -347,7 +347,7 @@ class HttpLinkedService(
             raise AuthenticationError(
                 message="Token is missing in the response from the token endpoint",
                 details={
-                    "type": self.kind.value,
+                    "type": self.type.value,
                     "response_body": response.text,
                     "reason": response.reason,
                     "url": response.url,
@@ -402,7 +402,7 @@ class HttpLinkedService(
             raise LinkedServiceException(
                 message=f"Unsupported auth_type: {self.settings.auth_type}",
                 details={
-                    "type": self.kind.value,
+                    "type": self.type.value,
                     "auth_type": self.settings.auth_type,
                     "error_type": type(exc).__name__,
                     "valid_auth_types": list(handlers.keys()),

@@ -5,27 +5,27 @@
 Enum contract tests.
 
 Covers:
-- Stability of ResourceKind string values.
+- Stability of ResourceType string values.
 - String-like behavior for serialization and logging.
 """
 
 from __future__ import annotations
 
-from ds_protocol_http_py_lib.enums import ResourceKind
+from ds_protocol_http_py_lib.enums import ResourceType
 
 
-def test_resource_kind_values_are_stable() -> None:
+def test_resource_type_values_are_stable() -> None:
     """
-    It defines stable string values for resource kinds.
+    It defines stable string values for resource types.
     """
 
-    assert ResourceKind.LINKED_SERVICE == "DS.RESOURCE.LINKED_SERVICE.HTTP"
-    assert ResourceKind.DATASET == "DS.RESOURCE.DATASET.HTTP"
+    assert ResourceType.LINKED_SERVICE == "DS.RESOURCE.LINKED_SERVICE.HTTP"
+    assert ResourceType.DATASET == "DS.RESOURCE.DATASET.HTTP"
 
 
-def test_resource_kind_is_string_like() -> None:
+def test_resource_type_is_string_like() -> None:
     """
     It behaves like a string for serialization purposes.
     """
 
-    assert str(ResourceKind.DATASET) == "DS.RESOURCE.DATASET.HTTP"
+    assert str(ResourceType.DATASET) == "DS.RESOURCE.DATASET.HTTP"

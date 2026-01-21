@@ -47,7 +47,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 from ds_resource_plugin_py_lib.common.serde.deserialize import PandasDeserializer
 from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 
-from ..enums import ResourceKind
+from ..enums import ResourceType
 from ..linked_service.http import HttpLinkedService
 
 
@@ -94,8 +94,8 @@ class HttpDataset(
     )
 
     @property
-    def kind(self) -> ResourceKind:
-        return ResourceKind.DATASET
+    def type(self) -> ResourceType:
+        return ResourceType.DATASET
 
     def create(self, **kwargs: Any) -> None:
         """
@@ -129,7 +129,7 @@ class HttpDataset(
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
         except ResourceException as exc:
-            exc.details.update({"type": self.kind.value})
+            exc.details.update({"type": self.type.value})
             raise CreateError(
                 message=exc.message,
                 status_code=exc.status_code,
@@ -174,7 +174,7 @@ class HttpDataset(
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
         except ResourceException as exc:
-            exc.details.update({"type": self.kind.value})
+            exc.details.update({"type": self.type.value})
             raise ReadError(
                 message=exc.message,
                 status_code=exc.status_code,
