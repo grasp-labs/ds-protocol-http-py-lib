@@ -25,10 +25,12 @@ Example:
 import threading
 import time
 
-from ds_common_logger_py_lib.mixin import LoggingMixin
+from ds_common_logger_py_lib import Logger
+
+logger = Logger.get_logger(__name__, package=True)
 
 
-class TokenBucket(LoggingMixin):
+class TokenBucket:
     """
     Token Bucket Rate Limiter
 
@@ -86,7 +88,7 @@ class TokenBucket(LoggingMixin):
 
                 wait = (1.0 - self.tokens) / self.rps
 
-            self.log.debug(f"Waiting {wait} seconds for token")
+            logger.debug(f"Waiting {wait} seconds for token")
             time.sleep(wait)
 
     def available(self) -> float:

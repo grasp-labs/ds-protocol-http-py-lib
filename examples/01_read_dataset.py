@@ -17,8 +17,8 @@ from ds_protocol_http_py_lib.linked_service.http import (
     HttpLinkedServiceSettings,
 )
 
-Logger()
-logger = Logger.get_logger(__name__)
+
+logger = Logger.get_logger(__name__,package = True)
 
 
 def main() -> pd.DataFrame:
@@ -46,8 +46,8 @@ def main() -> pd.DataFrame:
         dataset.linked_service.connect()
         while dataset.next:
             dataset.read()
-            logger.info("Dataset next: %s", dataset.next)
-            logger.info("Schema: %s", dataset.schema)
+            logger.debug("Dataset next: %s", dataset.next)
+            logger.debug("Schema: %s", dataset.schema)
             frames.append(dataset.output)
             break
     except ResourceException as exc:
