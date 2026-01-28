@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, NoReturn, TypeVar
 
 import pandas as pd
+from ds_common_logger_py_lib import Logger
 from ds_resource_plugin_py_lib.common.resource.dataset import (
     DatasetSettings,
     DatasetStorageFormatType,
@@ -49,6 +50,8 @@ from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 
 from ..enums import ResourceType
 from ..linked_service.http import HttpLinkedService
+
+logger = Logger.get_logger(__name__, package=True)
 
 
 @dataclass(kw_only=True)
@@ -113,7 +116,7 @@ class HttpDataset(
         if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
-        self.log.info(f"Sending {self.settings.method} request to {self.settings.url}")
+        logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
             response = self.linked_service.connection.request(
@@ -158,7 +161,7 @@ class HttpDataset(
         if self.linked_service.connection is None:
             raise ConnectionError(message="Connection is not initialized.")
 
-        self.log.info(f"Sending {self.settings.method} request to {self.settings.url}")
+        logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
             response = self.linked_service.connection.request(
