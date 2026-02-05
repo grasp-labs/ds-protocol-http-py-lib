@@ -7,21 +7,40 @@ HTTP Linked Service
 This module implements a linked service for HTTP APIs.
 
 Example:
+    >>> from ds_protocol_http_py_lib.enums import AuthType
     >>> linked_service = HttpLinkedService(
+    ...     id=uuid.uuid4(),
+    ...     name="example::linked_service",
+    ...     version="1.0.0",
     ...     settings=HttpLinkedServiceSettings(
-    ...         host="https://api.example.com",
-    ...         auth_type="OAuth2",
-    ...         client_id="",
-    ...         client_secret="",
-    ...         token_endpoint="https://api.example.com/token",
+    ...         host="api.example.com",
+    ...         auth_type=AuthType.OAUTH2,
+    ...         oauth2=OAuth2AuthSettings(
+    ...             token_endpoint="https://auth.example.com/token",
+    ...             client_id="my-client",
+    ...             client_secret="secret",
+    ...         ),
     ...     ),
     ... )
     >>> linked_service.connect()
 """
 
-from .http import HttpLinkedService, HttpLinkedServiceSettings
+from .http import (
+    ApiKeyAuthSettings,
+    BasicAuthSettings,
+    BearerAuthSettings,
+    CustomAuthSettings,
+    HttpLinkedService,
+    HttpLinkedServiceSettings,
+    OAuth2AuthSettings,
+)
 
 __all__ = [
+    "ApiKeyAuthSettings",
+    "BasicAuthSettings",
+    "BearerAuthSettings",
+    "CustomAuthSettings",
     "HttpLinkedService",
     "HttpLinkedServiceSettings",
+    "OAuth2AuthSettings",
 ]

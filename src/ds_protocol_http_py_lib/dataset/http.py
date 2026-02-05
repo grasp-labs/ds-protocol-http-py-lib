@@ -7,17 +7,24 @@ HTTP Dataset
 This module implements a dataset for HTTP APIs.
 
 Example:
+    >>> from ds_protocol_http_py_lib.enums import AuthType
+    >>> from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
     >>> dataset = HttpDataset(
     ...     deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
     ...     serializer=PandasSerializer(format=DatasetStorageFormatType.JSON),
     ...     settings=HttpDatasetSettings(
     ...         url="https://api.example.com/data",
-    ...         method="GET",
+    ...         method=HttpMethod.GET,
     ...     ),
     ...     linked_service=HttpLinkedService(
     ...         settings=HttpLinkedServiceSettings(
-    ...             host="https://api.example.com",
-    ...             auth_type="OAuth2",
+    ...             host="api.example.com",
+    ...             auth_type=AuthType.OAUTH2,
+    ...             oauth2=OAuth2AuthSettings(
+    ...                 token_endpoint="https://auth.example.com/token",
+    ...                 client_id="my-client",
+    ...                 client_secret="secret",
+    ...             ),
     ...         ),
     ...     ),
     ... )
@@ -26,7 +33,7 @@ Example:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Generic, Literal, NoReturn, TypeVar
+from typing import Any, Generic, NoReturn, TypeVar
 
 import pandas as pd
 from ds_common_logger_py_lib import Logger
@@ -48,7 +55,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 from ds_resource_plugin_py_lib.common.serde.deserialize import PandasDeserializer
 from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 
-from ..enums import ResourceType
+from ..enums import HttpMethod, ResourceType
 from ..linked_service.http import HttpLinkedService
 
 logger = Logger.get_logger(__name__, package=True)
@@ -56,14 +63,30 @@ logger = Logger.get_logger(__name__, package=True)
 
 @dataclass(kw_only=True)
 class HttpDatasetSettings(DatasetSettings):
-    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"] = "GET"
+    """
+    Settings for HTTP dataset.
+    """
+
+    method: HttpMethod = HttpMethod.GET
+    """The HTTP method to use."""
 
     url: str
+    """The URL to send the request to."""
+
     data: Any | None = None
+    """The data to send with the request."""
+
     json: dict[str, Any] | None = None
+    """The JSON data to send with the request."""
+
     params: dict[str, Any] | None = None
+    """The parameters to send with the request."""
+
     files: list[Any] | None = None
+    """The files to send with the request."""
+
     headers: dict[str, Any] | None = None
+    """The headers to send with the request."""
 
 
 HttpDatasetSettingsType = TypeVar(
