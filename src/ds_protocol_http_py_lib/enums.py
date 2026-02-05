@@ -14,6 +14,31 @@ Example:
 from enum import StrEnum
 
 
+class HttpMethod(StrEnum):
+    """
+    Constants for HTTP methods.
+    """
+
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    DELETE = "DELETE"
+    PATCH = "PATCH"
+
+
+class AuthType(StrEnum):
+    """
+    Constants for authentication types.
+    """
+
+    OAUTH2 = "OAuth2"
+    BASIC = "Basic"
+    API_KEY = "APIKey"
+    BEARER = "Bearer"
+    NO_AUTH = "NoAuth"
+    CUSTOM = "Custom"
+
+
 class ResourceType(StrEnum):
     """
     Constants for HTTP protocol.

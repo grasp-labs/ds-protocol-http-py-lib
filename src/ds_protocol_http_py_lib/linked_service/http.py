@@ -7,10 +7,18 @@ HTTP Linked Service
 This module implements a linked service for HTTP APIs.
 
 Example:
+    >>> from ds_protocol_http_py_lib import HttpLinkedService, HttpLinkedServiceSettings
+    >>> from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
+    >>> from ds_protocol_http_py_lib.enums import AuthType
     >>> linked_service = HttpLinkedService(
     ...     settings=HttpLinkedServiceSettings(
-    ...         host="https://api.example.com",
-    ...         auth_type="OAuth2",
+    ...         host="api.example.com",
+    ...         auth_type=AuthType.OAUTH2,
+    ...         oauth2=OAuth2AuthSettings(
+    ...             token_endpoint="https://auth.example.com/token",
+    ...             client_id="my-client",
+    ...             client_secret="secret",
+    ...         ),
     ...     ),
     ... )
     >>> linked_service.connect()
@@ -18,7 +26,7 @@ Example:
 
 import base64
 from dataclasses import dataclass, field
-from typing import Generic, Literal, TypeVar
+from typing import Generic, TypeVar
 
 from ds_resource_plugin_py_lib.common.resource.linked_service import (
     LinkedService,
@@ -30,7 +38,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 )
 
 from .. import PACKAGE_NAME, __version__
-from ..enums import ResourceType
+from ..enums import AuthType, ResourceType
 from ..utils import find_keys_in_json
 from ..utils.http.config import HttpConfig, RetryConfig
 from ..utils.http.provider import Http
@@ -38,34 +46,154 @@ from ..utils.http.token_bucket import TokenBucket
 
 
 @dataclass(kw_only=True)
-class HttpLinkedServiceSettings(LinkedServiceSettings):
+class ApiKeyAuthSettings:
     """
-    The object containing the HTTP linked service settings.
+    Settings for API Key authentication.
+
+    The API key will be added as a header to all requests.
     """
 
-    host: str
-    auth_type: Literal[
-        "OAuth2",
-        "Basic",
-        "APIKey",
-        "Bearer",
-        "NoAuth",
-        "Custom",
-    ]
-    schema: str = "https"
-    port: int | None = None
-    api_key_name: str | None = None
-    api_key_value: str | None = None
-    username_key_name: str | None = "email"
-    username_key_value: str | None = None
-    password_key_name: str | None = "password"
-    password_key_value: str | None = None
-    client_id: str | None = None
-    client_secret: str | None = None
-    token_endpoint: str | None = None
+    name: str
+    """The header name for the API key (e.g., 'X-API-Key', 'Authorization')."""
+
+    value: str = field(metadata={"mask": True})
+    """The API key value. Masked in logs."""
+
+
+@dataclass(kw_only=True)
+class BasicAuthSettings:
+    """
+    Settings for HTTP Basic authentication.
+
+    Uses standard HTTP Basic auth with base64-encoded username:password.
+    """
+
+    username: str
+    """The username for basic auth."""
+
+    password: str = field(metadata={"mask": True})
+    """The password for basic auth."""
+
+
+@dataclass(kw_only=True)
+class BearerAuthSettings:
+    """
+    Settings for Bearer token authentication.
+
+    Fetches a token by posting username/password to a token endpoint,
+    then uses the returned token as a Bearer token for subsequent requests.
+    """
+
+    token_endpoint: str
+    """The URL to fetch the bearer token from."""
+
+    username: str
+    """The username value to send in the token request."""
+
+    password: str = field(metadata={"mask": True})
+    """The password value to send in the token request."""
+
+    username_key_name: str = "email"
+    """The JSON key name for username in the token request body."""
+
+    password_key_name: str = "password"
+    """The JSON key name for password in the token request body."""
+
+
+@dataclass(kw_only=True)
+class OAuth2AuthSettings:
+    """
+    Settings for OAuth2 client credentials authentication.
+
+    Uses the OAuth2 client credentials flow to obtain an access token.
+    """
+
+    token_endpoint: str
+    """The OAuth2 token endpoint URL."""
+
+    client_id: str
+    """The OAuth2 client ID."""
+
+    client_secret: str = field(metadata={"mask": True})
+    """The OAuth2 client secret."""
+
     scope: str | None = None
-    headers: dict[str, str] | None = None
+    """Optional OAuth2 scope(s)."""
+
+
+@dataclass(kw_only=True)
+class CustomAuthSettings:
+    """
+    Settings for custom token-based authentication.
+
+    Posts to a token endpoint and extracts the access token from the response.
+    Uses the common ``headers`` field from ``HttpLinkedServiceSettings`` for the token request.
+    """
+
+    token_endpoint: str
+    """The URL to fetch the token from."""
+
     data: dict[str, str] | None = None
+    """Custom JSON data to send with the token request."""
+
+
+@dataclass(kw_only=True)
+class HttpLinkedServiceSettings(LinkedServiceSettings):
+    """
+    Settings for HTTP linked service connections.
+
+    Provide the appropriate auth settings object based on your auth_type:
+
+    - ``AuthType.API_KEY`` → ``api_key``
+    - ``AuthType.BASIC`` → ``basic``
+    - ``AuthType.BEARER`` → ``bearer``
+    - ``AuthType.OAUTH2`` → ``oauth2``
+    - ``AuthType.CUSTOM`` → ``custom``
+    - ``AuthType.NO_AUTH`` → (no auth settings needed)
+
+    Example:
+        >>> settings = HttpLinkedServiceSettings(
+        ...     host="api.example.com",
+        ...     auth_type=AuthType.OAUTH2,
+        ...     oauth2=OAuth2AuthSettings(
+        ...         token_endpoint="https://auth.example.com/token",
+        ...         client_id="my-client",
+        ...         client_secret="secret",
+        ...     ),
+        ... )
+    """
+
+    # Connection settings
+    host: str
+    """The API host (e.g., 'api.example.com')."""
+
+    auth_type: AuthType
+    """The authentication type to use."""
+
+    schema: str = "https"
+    """URL scheme ('http' or 'https')."""
+
+    port: int | None = None
+    """Optional port number."""
+
+    headers: dict[str, str] | None = None
+    """Additional headers to include with all requests."""
+
+    # Auth-specific settings (provide one based on auth_type)
+    api_key: ApiKeyAuthSettings | None = None
+    """Settings for API Key authentication. Required when auth_type=AuthType.API_KEY."""
+
+    basic: BasicAuthSettings | None = None
+    """Settings for Basic authentication. Required when auth_type=AuthType.BASIC."""
+
+    bearer: BearerAuthSettings | None = None
+    """Settings for Bearer token authentication. Required when auth_type=AuthType.BEARER."""
+
+    oauth2: OAuth2AuthSettings | None = None
+    """Settings for OAuth2 client credentials authentication. Required when auth_type=AuthType.OAUTH2."""
+
+    custom: CustomAuthSettings | None = None
+    """Settings for custom token authentication. Required when auth_type=AuthType.CUSTOM."""
 
 
 HttpLinkedServiceSettingsType = TypeVar(
@@ -85,8 +213,8 @@ class HttpLinkedService(
 
     settings: HttpLinkedServiceSettingsType
 
-    connection: Http | None = field(default=None, init=False)
-    _http: Http | None = field(default=None, init=False)
+    connection: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
+    _http: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
 
     def __post_init__(self) -> None:
         self.base_uri = (
@@ -151,20 +279,21 @@ class HttpLinkedService(
             str: The user token.
 
         Raises:
-            LinkedServiceException: If the token endpoint is missing.
+            LinkedServiceException: If bearer settings are missing.
             AuthenticationError: If the token is missing in the response.
         """
-        url = self.settings.token_endpoint
-        headers = {"Content-type": "application/json"}
-        data = {
-            self.settings.username_key_name: self.settings.username_key_value,
-            self.settings.password_key_name: self.settings.password_key_value,
-        }
-        if not url:
+        if not self.settings.bearer:
             raise LinkedServiceException(
-                message="Token endpoint is missing in the linked service settings",
+                message="Bearer auth settings are missing in the linked service settings",
                 details={"type": self.type.value},
             )
+
+        url = self.settings.bearer.token_endpoint
+        headers = {"Content-type": "application/json"}
+        data = {
+            self.settings.bearer.username_key_name: self.settings.bearer.username,
+            self.settings.bearer.password_key_name: self.settings.bearer.password,
+        }
 
         response = http.post(
             url=url,
@@ -198,22 +327,23 @@ class HttpLinkedService(
             str: The OAuth2 token.
 
         Raises:
-            LinkedServiceException: If the token endpoint is missing.
+            LinkedServiceException: If OAuth2 settings are missing.
             AuthenticationError: If the token is missing in the response.
         """
-        url = self.settings.token_endpoint
-        headers = {"Content-type": "application/x-www-form-urlencoded"}
-        data = {
-            "client_id": self.settings.client_id,
-            "client_secret": self.settings.client_secret,
-            "scope": self.settings.scope,
-            "grant_type": "client_credentials",
-        }
-        if not url:
+        if not self.settings.oauth2:
             raise LinkedServiceException(
-                message="Token endpoint is missing in the linked service settings",
+                message="OAuth2 auth settings are missing in the linked service settings",
                 details={"type": self.type.value},
             )
+
+        url = self.settings.oauth2.token_endpoint
+        headers = {"Content-type": "application/x-www-form-urlencoded"}
+        data = {
+            "client_id": self.settings.oauth2.client_id,
+            "client_secret": self.settings.oauth2.client_secret,
+            "scope": self.settings.oauth2.scope,
+            "grant_type": "client_credentials",
+        }
 
         response = http.post(
             url=url,
@@ -266,29 +396,22 @@ class HttpLinkedService(
         """
         Configure HTTP Basic authentication.
 
-        Uses `username_key_value` and `password_key_value` to construct a
-        base64-encoded `username:password` token and sets the session's
-        Authorization header.
+        Uses the basic auth settings to construct a base64-encoded
+        `username:password` token and sets the session's Authorization header.
 
         Args:
             http: The Http client instance to configure.
 
         Raises:
-            LinkedServiceException: If username or password is missing.
+            LinkedServiceException: If basic auth settings are missing.
         """
-        username = self.settings.username_key_value
-        password = self.settings.password_key_value
-        if not username:
+        if not self.settings.basic:
             raise LinkedServiceException(
-                message="Basic auth username is missing in the linked service",
+                message="Basic auth settings are missing in the linked service",
                 details={"type": self.type.value},
             )
-        if not password:
-            raise LinkedServiceException(
-                message="Basic auth password is missing in the linked service",
-                details={"type": self.type.value},
-            )
-        token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
+
+        token = base64.b64encode(f"{self.settings.basic.username}:{self.settings.basic.password}".encode()).decode("ascii")
         http.session.headers.update({"Authorization": f"Basic {token}"})
 
     def _configure_apikey_auth(self, http: Http) -> None:
@@ -301,19 +424,15 @@ class HttpLinkedService(
             http: The Http client instance to configure.
 
         Raises:
-            LinkedServiceException: If API key name or value is missing.
+            LinkedServiceException: If API key settings are missing.
         """
-        if not self.settings.api_key_name:
+        if not self.settings.api_key:
             raise LinkedServiceException(
-                message="API key name is missing in the linked service",
+                message="API key auth settings are missing in the linked service",
                 details={"type": self.type.value},
             )
-        if not self.settings.api_key_value:
-            raise LinkedServiceException(
-                message="API key value is missing in the linked service",
-                details={"type": self.type.value},
-            )
-        http.session.headers.update({self.settings.api_key_name: self.settings.api_key_value})
+
+        http.session.headers.update({self.settings.api_key.name: self.settings.api_key.value})
 
     def _configure_custom_auth(self, http: Http) -> None:
         """
@@ -328,18 +447,18 @@ class HttpLinkedService(
 
         Raises:
             AuthenticationError: If the token is missing in the response.
-            LinkedServiceException: If token endpoint is missing or the token cannot be found.
+            LinkedServiceException: If custom auth settings are missing.
         """
-        if not self.settings.token_endpoint:
+        if not self.settings.custom:
             raise LinkedServiceException(
-                message="Token endpoint is missing in the linked service settings",
+                message="Custom auth settings are missing in the linked service settings",
                 details={"type": self.type.value},
             )
 
         response = http.post(
-            url=self.settings.token_endpoint,
+            url=self.settings.custom.token_endpoint,
             headers=self.settings.headers,
-            json=self.settings.data,
+            json=self.settings.custom.data,
             timeout=30,
         )
         token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
