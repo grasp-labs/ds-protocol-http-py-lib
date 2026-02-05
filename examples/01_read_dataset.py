@@ -7,37 +7,50 @@ Example 01: Read a dataset over HTTP (GET) using ds-protocol-http-py-lib.
 
 from __future__ import annotations
 
+import logging
+import uuid
+
 import pandas as pd
 from ds_common_logger_py_lib import Logger
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
+from ds_protocol_http_py_lib.enums import AuthType, HttpMethod
+from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
 from ds_protocol_http_py_lib.linked_service.http import (
     HttpLinkedService,
     HttpLinkedServiceSettings,
 )
 
-
-logger = Logger.get_logger(__name__,package = True)
+Logger.configure(level=logging.DEBUG)
+logger = Logger.get_logger(__name__)
 
 
 def main() -> pd.DataFrame:
     linked_service = HttpLinkedService(
+        id=uuid.uuid4(),
+        name="example::linked_service",
+        version="1.0.0",
         settings=HttpLinkedServiceSettings(
-            host="",
-            auth_type="OAuth2",
+            host="http://example.com",
+            auth_type=AuthType.OAUTH2,
             headers={"Content-Type": "application/json"},
-            client_id="",
-            client_secret="",
-            token_endpoint="",
+            oauth2=OAuth2AuthSettings(
+                token_endpoint="http://example.com/oauth/token",
+                client_id="******",
+                client_secret="******",
+            ),
         ),
     )
 
     dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="example::dataset",
+        version="1.0.0",
         linked_service=linked_service,
         settings=HttpDatasetSettings(
-            method="GET",
-            url="",
+            method=HttpMethod.GET,
+            url="http://example.com/data",
         ),
     )
 
