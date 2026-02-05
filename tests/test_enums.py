@@ -11,7 +11,7 @@ Covers:
 
 from __future__ import annotations
 
-from ds_protocol_http_py_lib.enums import ResourceType
+from ds_protocol_http_py_lib.enums import AuthType, HttpMethod, ResourceType
 
 
 def test_resource_type_values_are_stable() -> None:
@@ -29,3 +29,28 @@ def test_resource_type_is_string_like() -> None:
     """
 
     assert str(ResourceType.DATASET) == "DS.RESOURCE.DATASET.HTTP"
+
+
+def test_http_method_values_are_stable() -> None:
+    """
+    It defines stable string values for HTTP methods.
+    """
+
+    assert HttpMethod.GET == "GET"
+    assert HttpMethod.POST == "POST"
+    assert HttpMethod.PUT == "PUT"
+    assert HttpMethod.DELETE == "DELETE"
+    assert HttpMethod.PATCH == "PATCH"
+
+
+def test_http_auth_type_values_are_stable() -> None:
+    """
+    It defines stable string values for HTTP authentication types.
+    """
+
+    assert AuthType.OAUTH2 == "OAuth2"
+    assert AuthType.BASIC == "Basic"
+    assert AuthType.API_KEY == "APIKey"
+    assert AuthType.BEARER == "Bearer"
+    assert AuthType.NO_AUTH == "NoAuth"
+    assert AuthType.CUSTOM == "Custom"
