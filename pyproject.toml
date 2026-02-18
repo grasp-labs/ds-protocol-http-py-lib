@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ds-protocol-http-py-lib"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 description = "A Python package from the ds-protocol library collection"
 dependencies = [
     "ds-resource-plugin-py-lib>=0.1.0b1,<1.0.0",
@@ -28,6 +28,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Operating System :: OS Independent",
   "Intended Audience :: Developers",
   "Topic :: Software Development :: Libraries :: Python Modules",
