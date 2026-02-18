@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
+    ConnectionError as LinkedServiceConnectionError,
+)
 from requests import HTTPError, Request, Response
 
 
@@ -149,19 +152,24 @@ class HttpClient:
         return self.response
 
 
-@dataclass(slots=True)
 class LinkedService:
     """
     Minimal linked service for HttpDataset tests.
     """
 
-    http: HttpClient
-    connection: HttpClient | None = None
-    closed: bool = False
+    def __init__(self, http: HttpClient) -> None:
+        self.http = http
+        self._session: HttpClient | None = None
+        self.closed = False
 
-    def connect(self) -> HttpClient:
-        self.connection = self.http
-        return self.connection
+    @property
+    def session(self) -> HttpClient:
+        if self._session is None:
+            raise LinkedServiceConnectionError(message="Session is not initialized", details={})
+        return self._session
+
+    def connect(self) -> None:
+        self._session = self.http
 
     def close(self) -> None:
         self.closed = True

@@ -73,8 +73,9 @@ def test_connect_initializes_http_when_missing() -> None:
     props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH)
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
     service._http = None
-    http = service.connect()
-    assert http is not None
+    service.connect()
+    assert service._http is not None
+    assert service.session is not None
 
 
 def test_connect_raises_for_unsupported_auth_type() -> None:
@@ -237,10 +238,9 @@ def test_connect_apikey_updates_session_headers() -> None:
         api_key=ApiKeyAuthSettings(name="X-API-Key", value="k"),
     )
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
-    http = service.connect()
-    assert service.connection is http
-    assert service._http is http
-    assert http.session.headers["X-API-Key"] == "k"
+    service.connect()
+    assert service.session is service._http
+    assert service.session.session.headers["X-API-Key"] == "k"
 
 
 def test_connect_apikey_requires_api_key_settings() -> None:
@@ -269,10 +269,9 @@ def test_connect_basic_sets_authorization_header() -> None:
         basic=BasicAuthSettings(username="u", password="p"),
     )
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
-    http = service.connect()
-    assert service.connection is http
-    assert service._http is http
-    header = str(http.session.headers["Authorization"])
+    service.connect()
+    assert service.session is service._http
+    header = str(service.session.session.headers["Authorization"])
     assert header.startswith("Basic ")
     encoded = header.split(" ", 1)[1].strip()
     assert base64.b64decode(encoded).decode("utf-8") == "u:p"
@@ -309,10 +308,9 @@ def test_connect_bearer_sets_authorization_header(monkeypatch: pytest.MonkeyPatc
     )
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
     monkeypatch.setattr(service, "_fetch_user_token", lambda http: "bt")
-    http = service.connect()
-    assert service.connection is http
-    assert service._http is http
-    assert http.session.headers["Authorization"] == "Bearer bt"
+    service.connect()
+    assert service.session is service._http
+    assert service.session.session.headers["Authorization"] == "Bearer bt"
 
 
 def test_connect_oauth2_sets_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -332,10 +330,9 @@ def test_connect_oauth2_sets_authorization_header(monkeypatch: pytest.MonkeyPatc
     )
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
     monkeypatch.setattr(service, "_fetch_oauth2_token", lambda http: "ot")
-    http = service.connect()
-    assert service.connection is http
-    assert service._http is http
-    assert http.session.headers["Authorization"] == "Bearer ot"
+    service.connect()
+    assert service.session is service._http
+    assert service.session.session.headers["Authorization"] == "Bearer ot"
 
 
 def test_connect_custom_requires_custom_settings() -> None:
@@ -372,9 +369,8 @@ def test_connect_custom_sets_bearer_authorization_header(token_payloads) -> None
             post_response=json_response(token_payloads["flat_token"], url="https://example.test/token", method="POST"),
         ),
     )
-    http = service.connect()
-    assert service.connection is http
-    assert http.session.headers["Authorization"] == "Bearer t3"
+    service.connect()
+    assert service.session.session.headers["Authorization"] == "Bearer t3"
 
 
 def test_connect_custom_raises_when_access_token_is_missing() -> None:
@@ -413,8 +409,8 @@ def test_connect_noauth_only_merges_headers() -> None:
 
     props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH, headers={"X-Test": "1"})
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
-    http = service.connect()
-    assert http.session.headers["X-Test"] == "1"
+    service.connect()
+    assert service.session.session.headers["X-Test"] == "1"
 
 
 def test_connect_is_idempotent_after_first_configuration() -> None:
@@ -424,10 +420,10 @@ def test_connect_is_idempotent_after_first_configuration() -> None:
 
     props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH, headers={"X-Test": "1"})
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
-    http1 = service.connect()
-    http1.session.headers["X-Once"] = "yes"
-    http2 = service.connect()
-    assert http2.session.headers["X-Once"] == "yes"
+    service.connect()
+    service.session.session.headers["X-Once"] = "yes"
+    service.connect()
+    assert service.session.session.headers["X-Once"] == "yes"
 
 
 def test_test_connection_returns_false_on_exception() -> None:
@@ -437,10 +433,9 @@ def test_test_connection_returns_false_on_exception() -> None:
 
     props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH)
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
-    service._http = cast(
-        "Any",
-        LinkedServiceHttp(session=type("S", (), {"headers": {}})(), get_error=RuntimeError("down")),
-    )
+    fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})(), get_error=RuntimeError("down"))
+    service._http = cast("Any", fake_http)
+    service._session = cast("Any", fake_http)
     ok, message = service.test_connection()
     assert ok is False
     assert "down" in message
@@ -453,7 +448,9 @@ def test_test_connection_returns_true_on_success() -> None:
 
     props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH)
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
-    service._http = cast("Any", LinkedServiceHttp(session=type("S", (), {"headers": {}})()))
+    fake_http = LinkedServiceHttp(session=type("S", (), {"headers": {}})())
+    service._http = cast("Any", fake_http)
+    service._session = cast("Any", fake_http)
     ok, message = service.test_connection()
     assert ok is True
     assert "successfully" in message
