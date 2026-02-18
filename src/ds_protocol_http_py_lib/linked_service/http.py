@@ -34,6 +34,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service import (
 )
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
+    ConnectionError,
     LinkedServiceException,
 )
 
@@ -213,7 +214,7 @@ class HttpLinkedService(
 
     settings: HttpLinkedServiceSettingsType
 
-    connection: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
+    _session: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
     _http: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
 
     def __post_init__(self) -> None:
@@ -236,6 +237,20 @@ class HttpLinkedService(
             ResourceType
         """
         return ResourceType.LINKED_SERVICE
+
+    @property
+    def session(self) -> Http:
+        """
+        Get the session.
+        Returns:
+            Http: The session.
+        """
+        if self._session is None:
+            raise ConnectionError(
+                message="Session is not initialized",
+                details={"type": self.type.value},
+            )
+        return self._session
 
     def _init_http(self) -> Http:
         """
@@ -488,7 +503,7 @@ class HttpLinkedService(
 
         return
 
-    def connect(self) -> Http:
+    def connect(self) -> None:
         """
         Connect to the HTTP API and configure authentication.
 
@@ -497,7 +512,7 @@ class HttpLinkedService(
         Updates the session headers with the configured headers.
 
         Returns:
-            Http: The Http client instance with authentication configured.
+            None: The session is configured.
 
         Raises:
             AuthenticationError: If the authentication fails.
@@ -531,8 +546,7 @@ class HttpLinkedService(
         if self.settings.headers:
             self._http.session.headers.update(self.settings.headers)
 
-        self.connection = self._http
-        return self.connection
+        self._session = self._http
 
     def test_connection(self) -> tuple[bool, str]:
         """
@@ -542,8 +556,7 @@ class HttpLinkedService(
             tuple[bool, str]: A tuple containing a boolean indicating success and a string message.
         """
         try:
-            http = self.connect()
-            http.get(self.base_uri)
+            self.session.get(self.base_uri)
             return True, "Connection successfully tested"
         except Exception as exc:
             return False, str(exc)

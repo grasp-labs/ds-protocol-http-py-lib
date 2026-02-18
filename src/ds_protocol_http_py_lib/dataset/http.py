@@ -136,13 +136,10 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             CreateError: If the create error occurs.
         """
-        if self.linked_service.connection is None:
-            raise ConnectionError(message="Connection is not initialized.")
-
         logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
-            response = self.linked_service.connection.request(
+            response = self.linked_service.session.request(
                 method=self.settings.method,
                 url=self.settings.url,
                 data=self.settings.data,
@@ -181,13 +178,10 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             ReadError: If the read error occurs.
         """
-        if self.linked_service.connection is None:
-            raise ConnectionError(message="Connection is not initialized.")
-
         logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
-            response = self.linked_service.connection.request(
+            response = self.linked_service.session.request(
                 method=self.settings.method,
                 url=self.settings.url,
                 data=self.settings.data,
