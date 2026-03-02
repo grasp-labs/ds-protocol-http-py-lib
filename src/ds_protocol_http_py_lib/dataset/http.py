@@ -222,7 +222,7 @@ class HttpDataset(
         """
         raise NotSupportedError("Rename operation is not supported for Http datasets")
 
-    def upsert(self) -> None:
+    def upsert(self) -> NoReturn:
         """
         Upsert entity using http.
         """
