@@ -161,7 +161,6 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
-            self._set_schema(self.output)
         else:
             self.output = pd.DataFrame()
 
@@ -203,7 +202,6 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
-            self._set_schema(self.output)
             self.output = pd.DataFrame()
 
     def delete(self) -> NoReturn:
@@ -247,14 +245,3 @@ class HttpDataset(
         Close the dataset.
         """
         self.linked_service.close()
-
-    def _set_schema(self, content: pd.DataFrame) -> None:
-        """
-        Set the schema from the content.
-
-        Args:
-            content: The content to set the schema from.
-        """
-        self.schema = {
-            str(col): str(dtype) for col, dtype in content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()
-        }

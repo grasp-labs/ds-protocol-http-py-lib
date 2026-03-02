@@ -80,32 +80,6 @@ def test_read_raises_when_connection_is_missing() -> None:
         dataset.read()
 
 
-def test_create_serializes_and_deserializes_when_content_is_present() -> None:
-    """
-    It serializes outgoing content and deserializes response content.
-    """
-
-    deserializer = DeserializerStub()
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
-    linked_service = LinkedService(http=http)
-    props = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.POST)
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", linked_service),
-        settings=props,
-        deserializer=cast("Any", deserializer),
-    )
-    linked_service.connect()
-    dataset.create()
-    assert deserializer.called_with == b'{"ok": 1}'
-    assert isinstance(dataset.output, pd.DataFrame)
-    assert http.last_request is not None
-    assert http.last_request["method"] == "POST"
-    assert http.last_request["url"] == "https://example.test/data"
-
-
 def test_create_without_serializer_still_makes_request_and_deserializes() -> None:
     """
     It can run create when serializer is None and still deserialize response content.
@@ -267,31 +241,6 @@ def test_dataset_unimplemented_methods_raise() -> None:
         dataset.update()
     with pytest.raises(NotSupportedError):
         dataset.rename()
-
-
-def test_set_schema_populates_schema_from_dataframe() -> None:
-    """
-    It derives a string schema mapping from the dataframe columns/dtypes.
-    """
-    props = HttpDatasetSettings(url="https://example.test/data")
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))),
-        settings=props,
-    )
-    df = pd.DataFrame(
-        {
-            "a": [1, 2, 3],
-            "b": ["x", "y", "z"],
-            "c": [True, False, True],
-        }
-    )
-    dataset._set_schema(df)
-    assert dataset.schema is not None
-    assert set(dataset.schema.keys()) == {"a", "b", "c"}
-    assert all(isinstance(v, str) and v for v in dataset.schema.values())
 
 
 def test_close_delegates_to_linked_service_close() -> None:
