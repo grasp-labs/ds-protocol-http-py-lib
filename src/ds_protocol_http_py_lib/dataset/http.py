@@ -234,19 +234,19 @@ class HttpDataset(
         """
         Upsert entity using http.
         """
-        raise NotSupportedError("Upsert operation is not supported for Graphql dataset")
+        raise NotSupportedError("Upsert operation is not supported for Http datasets")
 
     def purge(self) -> NoReturn:
         """
         Purge entity using http.
         """
-        raise NotSupportedError("Purge operation is not supported for Graphql dataset")
+        raise NotSupportedError("Purge operation is not supported for Http datasets")
 
     def list(self) -> NoReturn:
         """
         List entity using http.
         """
-        raise NotSupportedError("List operation is not supported for Graphql dataset")
+        raise NotSupportedError("List operation is not supported for Http datasets")
 
     def close(self) -> None:
         """
