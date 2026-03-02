@@ -204,12 +204,6 @@ class HttpDataset(
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
             self._set_schema(self.output)
-            self.checkpoint["next"] = self.deserializer.get_next(response.content)
-            if self.checkpoint["next"]:
-                self.checkpoint["cursor"] = self.deserializer.get_end_cursor(response.content)
-        else:
-            self.checkpoint["next"] = False
-            self.checkpoint["cursor"] = None
             self.output = pd.DataFrame()
 
     def delete(self) -> NoReturn:

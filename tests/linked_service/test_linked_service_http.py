@@ -370,7 +370,7 @@ def test_connect_custom_sets_bearer_authorization_header(token_payloads) -> None
         ),
     )
     service.connect()
-    assert service.connection._session.headers["Authorization"] == "Bearer t3"
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
 
 
 def test_connect_custom_raises_when_access_token_is_missing() -> None:

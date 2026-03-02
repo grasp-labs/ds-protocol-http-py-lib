@@ -148,52 +148,6 @@ def test_create_sets_empty_dataframe_when_response_has_no_content() -> None:
     assert dataset.output.empty is True
 
 
-def test_read_sets_next_and_cursor_when_deserializer_indicates_more() -> None:
-    """
-    It populates next and cursor fields when deserializer reports pagination.
-    """
-
-    deserializer = DeserializerStub(next_value=True, cursor_value="c")
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1, "next": true}'))
-    linked_service = LinkedService(http=http)
-    props = HttpDatasetSettings(url="https://example.test/data")
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", linked_service),
-        settings=props,
-        deserializer=cast("Any", deserializer),
-    )
-    linked_service.connect()
-    dataset.read()
-    assert dataset.checkpoint.get("next") is True
-    assert dataset.checkpoint.get("cursor") == "c"
-
-
-def test_read_does_not_set_cursor_when_next_is_false() -> None:
-    """
-    It leaves cursor unset when deserializer reports no further page.
-    """
-
-    deserializer = DeserializerStub(next_value=False, cursor_value="c")
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
-    linked_service = LinkedService(http=http)
-    props = HttpDatasetSettings(url="https://example.test/data")
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", linked_service),
-        settings=props,
-        deserializer=cast("Any", deserializer),
-    )
-    linked_service.connect()
-    dataset.read()
-    assert dataset.checkpoint.get("next") is False
-    assert dataset.checkpoint.get("cursor") is None
-
-
 def test_read_sets_defaults_when_response_has_no_content() -> None:
     """
     It sets next to False, cursor to None, and content to empty DataFrame when no content exists.
@@ -207,8 +161,6 @@ def test_read_sets_defaults_when_response_has_no_content() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.checkpoint.get("next") is False
-    assert dataset.checkpoint.get("cursor") is None
     assert isinstance(dataset.output, pd.DataFrame)
     assert dataset.output.empty is True
 

@@ -236,7 +236,7 @@ class LinkedServiceHttp:
         self.closed = True
 
     @property
-    def connection(self) -> Any:
+    def session(self) -> Any:
         return self._session
 
 
