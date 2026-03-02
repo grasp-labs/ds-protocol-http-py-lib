@@ -241,6 +241,12 @@ def test_dataset_unimplemented_methods_raise() -> None:
         dataset.update()
     with pytest.raises(NotSupportedError):
         dataset.rename()
+    with pytest.raises(NotSupportedError):
+        dataset.purge()
+    with pytest.raises(NotSupportedError):
+        dataset.list()
+    with pytest.raises(NotSupportedError):
+        dataset.upsert()
 
 
 def test_close_delegates_to_linked_service_close() -> None:
