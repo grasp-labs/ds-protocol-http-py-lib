@@ -215,7 +215,7 @@ class LinkedServiceHttp:
     Minimal Http-like object used by HttpLinkedService tests.
     """
 
-    session: Any
+    _session: Any
     post_response: Any | None = None
     post_error: Exception | None = None
     get_error: Exception | None = None
@@ -234,6 +234,10 @@ class LinkedServiceHttp:
 
     def close(self) -> None:
         self.closed = True
+
+    @property
+    def connection(self) -> Any:
+        return self._session
 
 
 def http_error(

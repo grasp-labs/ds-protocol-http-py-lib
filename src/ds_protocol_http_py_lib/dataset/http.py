@@ -46,7 +46,7 @@ from ds_resource_plugin_py_lib.common.resource.dataset.errors import (
     CreateError,
     ReadError,
 )
-from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
     AuthorizationError,
@@ -139,7 +139,7 @@ class HttpDataset(
         logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
-            response = self.linked_service.session.request(
+            response = self.linked_service.connection.request(
                 method=self.settings.method,
                 url=self.settings.url,
                 data=self.settings.data,
@@ -181,7 +181,7 @@ class HttpDataset(
         logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
-            response = self.linked_service.session.request(
+            response = self.linked_service.connection.request(
                 method=self.settings.method,
                 url=self.settings.url,
                 data=self.settings.data,
@@ -204,22 +204,49 @@ class HttpDataset(
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
             self._set_schema(self.output)
-            self.next = self.deserializer.get_next(response.content)
-            if self.next:
-                self.cursor = self.deserializer.get_end_cursor(response.content)
+            self.checkpoint["next"] = self.deserializer.get_next(response.content)
+            if self.checkpoint["next"]:
+                self.checkpoint["cursor"] = self.deserializer.get_end_cursor(response.content)
         else:
-            self.next = False
-            self.cursor = None
+            self.checkpoint["next"] = False
+            self.checkpoint["cursor"] = None
             self.output = pd.DataFrame()
 
-    def delete(self, **kwargs: Any) -> NoReturn:
-        raise NotImplementedError("Delete operation is not supported for Http datasets")
+    def delete(self) -> NoReturn:
+        """
+        Delete entity using http.
+        """
+        raise NotSupportedError("Delete operation is not supported for Http datasets")
 
-    def update(self, **kwargs: Any) -> NoReturn:
-        raise NotImplementedError("Update operation is not supported for Http datasets")
+    def update(self) -> NoReturn:
+        """
+        Update entity using http.
+        """
+        raise NotSupportedError("Update operation is not supported for Http datasets")
 
-    def rename(self, **kwargs: Any) -> NoReturn:
-        raise NotImplementedError("Rename operation is not supported for Http datasets")
+    def rename(self) -> NoReturn:
+        """
+        Rename entity using http.
+        """
+        raise NotSupportedError("Rename operation is not supported for Http datasets")
+
+    def upsert(self) -> None:
+        """
+        Upsert entity using http.
+        """
+        raise NotSupportedError("Upsert operation is not supported for Graphql dataset")
+
+    def purge(self) -> NoReturn:
+        """
+        Purge entity using http.
+        """
+        raise NotSupportedError("Purge operation is not supported for Graphql dataset")
+
+    def list(self) -> NoReturn:
+        """
+        List entity using http.
+        """
+        raise NotSupportedError("List operation is not supported for Graphql dataset")
 
     def close(self) -> None:
         """

@@ -239,7 +239,7 @@ class HttpLinkedService(
         return ResourceType.LINKED_SERVICE
 
     @property
-    def session(self) -> Http:
+    def connection(self) -> Http:
         """
         Get the session.
         Returns:
@@ -392,7 +392,7 @@ class HttpLinkedService(
             http: The Http client instance to configure.
         """
         user_access_token = self._fetch_user_token(http)
-        http.session.headers.update({"Authorization": f"Bearer {user_access_token}"})
+        http._session.headers.update({"Authorization": f"Bearer {user_access_token}"})
 
     def _configure_oauth2_auth(self, http: Http) -> None:
         """
@@ -405,7 +405,7 @@ class HttpLinkedService(
             http: The Http client instance to configure.
         """
         oauth2_access_token = self._fetch_oauth2_token(http)
-        http.session.headers.update({"Authorization": f"Bearer {oauth2_access_token}"})
+        http._session.headers.update({"Authorization": f"Bearer {oauth2_access_token}"})
 
     def _configure_basic_auth(self, http: Http) -> None:
         """
@@ -427,7 +427,7 @@ class HttpLinkedService(
             )
 
         token = base64.b64encode(f"{self.settings.basic.username}:{self.settings.basic.password}".encode()).decode("ascii")
-        http.session.headers.update({"Authorization": f"Basic {token}"})
+        http._session.headers.update({"Authorization": f"Basic {token}"})
 
     def _configure_apikey_auth(self, http: Http) -> None:
         """
@@ -447,7 +447,7 @@ class HttpLinkedService(
                 details={"type": self.type.value},
             )
 
-        http.session.headers.update({self.settings.api_key.name: self.settings.api_key.value})
+        http._session.headers.update({self.settings.api_key.name: self.settings.api_key.value})
 
     def _configure_custom_auth(self, http: Http) -> None:
         """
@@ -489,7 +489,7 @@ class HttpLinkedService(
                 },
             )
 
-        http.session.headers.update({"Authorization": f"Bearer {token}"})
+        http._session.headers.update({"Authorization": f"Bearer {token}"})
 
     def _configure_noauth(self, _http: Http) -> None:
         """
@@ -544,7 +544,7 @@ class HttpLinkedService(
             ) from exc
 
         if self.settings.headers:
-            self._http.session.headers.update(self.settings.headers)
+            self._http._session.headers.update(self.settings.headers)
 
         self._session = self._http
 
@@ -556,7 +556,7 @@ class HttpLinkedService(
             tuple[bool, str]: A tuple containing a boolean indicating success and a string message.
         """
         try:
-            self.session.get(self.base_uri)
+            self.connection.get(self.base_uri)
             return True, "Connection successfully tested"
         except Exception as exc:
             return False, str(exc)

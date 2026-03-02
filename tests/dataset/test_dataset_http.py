@@ -19,7 +19,7 @@ from typing import Any, cast
 import pandas as pd
 import pytest
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import CreateError, ReadError
-from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
     AuthorizationError,
@@ -167,8 +167,8 @@ def test_read_sets_next_and_cursor_when_deserializer_indicates_more() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.next is True
-    assert dataset.cursor == "c"
+    assert dataset.checkpoint["next"] is True
+    assert dataset.checkpoint["cursor"] == "c"
 
 
 def test_read_does_not_set_cursor_when_next_is_false() -> None:
@@ -190,8 +190,8 @@ def test_read_does_not_set_cursor_when_next_is_false() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.next is False
-    assert dataset.cursor is None
+    assert dataset.checkpoint.get("next") is False
+    assert dataset.checkpoint.get("cursor") is None
 
 
 def test_read_sets_defaults_when_response_has_no_content() -> None:
@@ -207,8 +207,8 @@ def test_read_sets_defaults_when_response_has_no_content() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.next is False
-    assert dataset.cursor is None
+    assert dataset.checkpoint["next"] is False
+    assert dataset.checkpoint["cursor"] is None
     assert isinstance(dataset.output, pd.DataFrame)
     assert dataset.output.empty is True
 
@@ -301,7 +301,7 @@ def test_dataset_create_propagates_authz_and_connection_errors(exc: Exception) -
 
 def test_dataset_unimplemented_methods_raise() -> None:
     """
-    It raises NotImplementedError for delete/update/rename.
+    It raises NotSupportedError for delete/update/rename.
     """
     http = HttpClient(response=HttpResponseBytes(content=b""))
     linked_service = LinkedService(http=http)
@@ -309,11 +309,11 @@ def test_dataset_unimplemented_methods_raise() -> None:
     dataset = HttpDataset(
         id=uuid.uuid4(), name="test-dataset", version="1.0.0", linked_service=cast("Any", linked_service), settings=props
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotSupportedError):
         dataset.delete()
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotSupportedError):
         dataset.update()
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotSupportedError):
         dataset.rename()
 
 
