@@ -167,8 +167,8 @@ def test_read_sets_next_and_cursor_when_deserializer_indicates_more() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.checkpoint["next"] is True
-    assert dataset.checkpoint["cursor"] == "c"
+    assert dataset.checkpoint.get("next") is True
+    assert dataset.checkpoint.get("cursor") == "c"
 
 
 def test_read_does_not_set_cursor_when_next_is_false() -> None:
@@ -207,8 +207,8 @@ def test_read_sets_defaults_when_response_has_no_content() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.checkpoint["next"] is False
-    assert dataset.checkpoint["cursor"] is None
+    assert dataset.checkpoint.get("next") is False
+    assert dataset.checkpoint.get("cursor") is None
     assert isinstance(dataset.output, pd.DataFrame)
     assert dataset.output.empty is True
 

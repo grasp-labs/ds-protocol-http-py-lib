@@ -163,7 +163,7 @@ class LinkedService:
         self.closed = False
 
     @property
-    def session(self) -> HttpClient:
+    def connection(self) -> HttpClient:
         if self._session is None:
             raise LinkedServiceConnectionError(message="Session is not initialized", details={})
         return self._session
