@@ -123,7 +123,7 @@ class HttpDataset(
     def type(self) -> ResourceType:
         return ResourceType.DATASET
 
-    def create(self, **kwargs: Any) -> None:
+    def create(self) -> None:
         """
         Create data at the specified endpoint.
 
@@ -147,7 +147,6 @@ class HttpDataset(
                 files=self.settings.files,
                 params=self.settings.params,
                 headers=self.settings.headers,
-                **kwargs,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
@@ -164,7 +163,7 @@ class HttpDataset(
         else:
             self.output = pd.DataFrame()
 
-    def read(self, **kwargs: Any) -> None:
+    def read(self) -> None:
         """
         Read data from the specified endpoint.
 
@@ -188,7 +187,6 @@ class HttpDataset(
                 files=self.settings.files,
                 params=self.settings.params,
                 headers=self.settings.headers,
-                **kwargs,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
