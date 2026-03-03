@@ -202,6 +202,7 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
+        else:
             self.output = pd.DataFrame()
 
     def delete(self) -> NoReturn:

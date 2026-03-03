@@ -14,9 +14,11 @@ Covers:
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pandas as pd
+import pandas.testing as pdt
 import pytest
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import CreateError, ReadError
 from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
@@ -265,3 +267,23 @@ def test_close_delegates_to_linked_service_close() -> None:
     assert linked_service.closed is False
     dataset.close()
     assert linked_service.closed is True
+
+
+def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
+    """
+    Ensure `HttpDataset.read` preserves the deserializer result and does not
+    overwrite it with an empty DataFrame.
+    """
+    content = b'{"x": [1]}'
+    connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=content))
+    linked_service = SimpleNamespace(connection=connection, close=lambda: None)
+
+    settings = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.GET)
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+
+    expected = pd.DataFrame({"x": [1]})
+    dataset.deserializer = lambda c: expected
+
+    dataset.read()
+
+    pdt.assert_frame_equal(dataset.output, expected)
