@@ -14,12 +14,14 @@ Covers:
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pandas as pd
+import pandas.testing as pdt
 import pytest
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import CreateError, ReadError
-from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
     AuthorizationError,
@@ -80,32 +82,6 @@ def test_read_raises_when_connection_is_missing() -> None:
         dataset.read()
 
 
-def test_create_serializes_and_deserializes_when_content_is_present() -> None:
-    """
-    It serializes outgoing content and deserializes response content.
-    """
-
-    deserializer = DeserializerStub()
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
-    linked_service = LinkedService(http=http)
-    props = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.POST)
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", linked_service),
-        settings=props,
-        deserializer=cast("Any", deserializer),
-    )
-    linked_service.connect()
-    dataset.create()
-    assert deserializer.called_with == b'{"ok": 1}'
-    assert isinstance(dataset.output, pd.DataFrame)
-    assert http.last_request is not None
-    assert http.last_request["method"] == "POST"
-    assert http.last_request["url"] == "https://example.test/data"
-
-
 def test_create_without_serializer_still_makes_request_and_deserializes() -> None:
     """
     It can run create when serializer is None and still deserialize response content.
@@ -148,52 +124,6 @@ def test_create_sets_empty_dataframe_when_response_has_no_content() -> None:
     assert dataset.output.empty is True
 
 
-def test_read_sets_next_and_cursor_when_deserializer_indicates_more() -> None:
-    """
-    It populates next and cursor fields when deserializer reports pagination.
-    """
-
-    deserializer = DeserializerStub(next_value=True, cursor_value="c")
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1, "next": true}'))
-    linked_service = LinkedService(http=http)
-    props = HttpDatasetSettings(url="https://example.test/data")
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", linked_service),
-        settings=props,
-        deserializer=cast("Any", deserializer),
-    )
-    linked_service.connect()
-    dataset.read()
-    assert dataset.next is True
-    assert dataset.cursor == "c"
-
-
-def test_read_does_not_set_cursor_when_next_is_false() -> None:
-    """
-    It leaves cursor unset when deserializer reports no further page.
-    """
-
-    deserializer = DeserializerStub(next_value=False, cursor_value="c")
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
-    linked_service = LinkedService(http=http)
-    props = HttpDatasetSettings(url="https://example.test/data")
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", linked_service),
-        settings=props,
-        deserializer=cast("Any", deserializer),
-    )
-    linked_service.connect()
-    dataset.read()
-    assert dataset.next is False
-    assert dataset.cursor is None
-
-
 def test_read_sets_defaults_when_response_has_no_content() -> None:
     """
     It sets next to False, cursor to None, and content to empty DataFrame when no content exists.
@@ -207,8 +137,6 @@ def test_read_sets_defaults_when_response_has_no_content() -> None:
     )
     linked_service.connect()
     dataset.read()
-    assert dataset.next is False
-    assert dataset.cursor is None
     assert isinstance(dataset.output, pd.DataFrame)
     assert dataset.output.empty is True
 
@@ -301,7 +229,7 @@ def test_dataset_create_propagates_authz_and_connection_errors(exc: Exception) -
 
 def test_dataset_unimplemented_methods_raise() -> None:
     """
-    It raises NotImplementedError for delete/update/rename.
+    It raises NotSupportedError for delete/update/rename.
     """
     http = HttpClient(response=HttpResponseBytes(content=b""))
     linked_service = LinkedService(http=http)
@@ -309,37 +237,18 @@ def test_dataset_unimplemented_methods_raise() -> None:
     dataset = HttpDataset(
         id=uuid.uuid4(), name="test-dataset", version="1.0.0", linked_service=cast("Any", linked_service), settings=props
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotSupportedError):
         dataset.delete()
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotSupportedError):
         dataset.update()
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotSupportedError):
         dataset.rename()
-
-
-def test_set_schema_populates_schema_from_dataframe() -> None:
-    """
-    It derives a string schema mapping from the dataframe columns/dtypes.
-    """
-    props = HttpDatasetSettings(url="https://example.test/data")
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="test-dataset",
-        version="1.0.0",
-        linked_service=cast("Any", LinkedService(http=HttpClient(response=HttpResponseBytes(content=b"")))),
-        settings=props,
-    )
-    df = pd.DataFrame(
-        {
-            "a": [1, 2, 3],
-            "b": ["x", "y", "z"],
-            "c": [True, False, True],
-        }
-    )
-    dataset._set_schema(df)
-    assert dataset.schema is not None
-    assert set(dataset.schema.keys()) == {"a", "b", "c"}
-    assert all(isinstance(v, str) and v for v in dataset.schema.values())
+    with pytest.raises(NotSupportedError):
+        dataset.purge()
+    with pytest.raises(NotSupportedError):
+        dataset.list()
+    with pytest.raises(NotSupportedError):
+        dataset.upsert()
 
 
 def test_close_delegates_to_linked_service_close() -> None:
@@ -358,3 +267,23 @@ def test_close_delegates_to_linked_service_close() -> None:
     assert linked_service.closed is False
     dataset.close()
     assert linked_service.closed is True
+
+
+def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
+    """
+    Ensure `HttpDataset.read` preserves the deserializer result and does not
+    overwrite it with an empty DataFrame.
+    """
+    content = b'{"x": [1]}'
+    connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=content))
+    linked_service = SimpleNamespace(connection=connection, close=lambda: None)
+
+    settings = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.GET)
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+
+    expected = pd.DataFrame({"x": [1]})
+    dataset.deserializer = lambda c: expected
+
+    dataset.read()
+
+    pdt.assert_frame_equal(dataset.output, expected)

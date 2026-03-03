@@ -239,7 +239,7 @@ class HttpLinkedService(
         return ResourceType.LINKED_SERVICE
 
     @property
-    def session(self) -> Http:
+    def connection(self) -> Http:
         """
         Get the session.
         Returns:
@@ -556,7 +556,7 @@ class HttpLinkedService(
             tuple[bool, str]: A tuple containing a boolean indicating success and a string message.
         """
         try:
-            self.session.get(self.base_uri)
+            self.connection.get(self.base_uri)
             return True, "Connection successfully tested"
         except Exception as exc:
             return False, str(exc)

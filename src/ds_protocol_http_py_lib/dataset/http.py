@@ -46,7 +46,7 @@ from ds_resource_plugin_py_lib.common.resource.dataset.errors import (
     CreateError,
     ReadError,
 )
-from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
     AuthorizationError,
@@ -123,7 +123,7 @@ class HttpDataset(
     def type(self) -> ResourceType:
         return ResourceType.DATASET
 
-    def create(self, **kwargs: Any) -> None:
+    def create(self) -> None:
         """
         Create data at the specified endpoint.
 
@@ -139,7 +139,7 @@ class HttpDataset(
         logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
-            response = self.linked_service.session.request(
+            response = self.linked_service.connection.request(
                 method=self.settings.method,
                 url=self.settings.url,
                 data=self.settings.data,
@@ -147,7 +147,6 @@ class HttpDataset(
                 files=self.settings.files,
                 params=self.settings.params,
                 headers=self.settings.headers,
-                **kwargs,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
@@ -161,11 +160,10 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
-            self._set_schema(self.output)
         else:
             self.output = pd.DataFrame()
 
-    def read(self, **kwargs: Any) -> None:
+    def read(self) -> None:
         """
         Read data from the specified endpoint.
 
@@ -181,7 +179,7 @@ class HttpDataset(
         logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
 
         try:
-            response = self.linked_service.session.request(
+            response = self.linked_service.connection.request(
                 method=self.settings.method,
                 url=self.settings.url,
                 data=self.settings.data,
@@ -189,7 +187,6 @@ class HttpDataset(
                 files=self.settings.files,
                 params=self.settings.params,
                 headers=self.settings.headers,
-                **kwargs,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
             raise exc
@@ -203,37 +200,47 @@ class HttpDataset(
 
         if response.content and self.deserializer:
             self.output = self.deserializer(response.content)
-            self._set_schema(self.output)
-            self.next = self.deserializer.get_next(response.content)
-            if self.next:
-                self.cursor = self.deserializer.get_end_cursor(response.content)
         else:
-            self.next = False
-            self.cursor = None
             self.output = pd.DataFrame()
 
-    def delete(self, **kwargs: Any) -> NoReturn:
-        raise NotImplementedError("Delete operation is not supported for Http datasets")
+    def delete(self) -> NoReturn:
+        """
+        Delete entity using http.
+        """
+        raise NotSupportedError("Delete operation is not supported for Http datasets")
 
-    def update(self, **kwargs: Any) -> NoReturn:
-        raise NotImplementedError("Update operation is not supported for Http datasets")
+    def update(self) -> NoReturn:
+        """
+        Update entity using http.
+        """
+        raise NotSupportedError("Update operation is not supported for Http datasets")
 
-    def rename(self, **kwargs: Any) -> NoReturn:
-        raise NotImplementedError("Rename operation is not supported for Http datasets")
+    def rename(self) -> NoReturn:
+        """
+        Rename entity using http.
+        """
+        raise NotSupportedError("Rename operation is not supported for Http datasets")
+
+    def upsert(self) -> NoReturn:
+        """
+        Upsert entity using http.
+        """
+        raise NotSupportedError("Upsert operation is not supported for Http datasets")
+
+    def purge(self) -> NoReturn:
+        """
+        Purge entity using http.
+        """
+        raise NotSupportedError("Purge operation is not supported for Http datasets")
+
+    def list(self) -> NoReturn:
+        """
+        List entity using http.
+        """
+        raise NotSupportedError("List operation is not supported for Http datasets")
 
     def close(self) -> None:
         """
         Close the dataset.
         """
         self.linked_service.close()
-
-    def _set_schema(self, content: pd.DataFrame) -> None:
-        """
-        Set the schema from the content.
-
-        Args:
-            content: The content to set the schema from.
-        """
-        self.schema = {
-            str(col): str(dtype) for col, dtype in content.convert_dtypes(dtype_backend="pyarrow").dtypes.to_dict().items()
-        }
