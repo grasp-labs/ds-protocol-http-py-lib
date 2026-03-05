@@ -19,8 +19,8 @@ def test_resource_type_values_are_stable() -> None:
     It defines stable string values for resource types.
     """
 
-    assert ResourceType.LINKED_SERVICE == "DS.RESOURCE.LINKED_SERVICE.HTTP"
-    assert ResourceType.DATASET == "DS.RESOURCE.DATASET.HTTP"
+    assert ResourceType.LINKED_SERVICE == "ds.resource.linked-service.http"
+    assert ResourceType.DATASET == "ds.resource.dataset.http"
 
 
 def test_resource_type_is_string_like() -> None:
@@ -28,7 +28,7 @@ def test_resource_type_is_string_like() -> None:
     It behaves like a string for serialization purposes.
     """
 
-    assert str(ResourceType.DATASET) == "DS.RESOURCE.DATASET.HTTP"
+    assert str(ResourceType.DATASET) == "ds.resource.dataset.http"
 
 
 def test_http_method_values_are_stable() -> None:
