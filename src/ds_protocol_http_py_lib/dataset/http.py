@@ -140,7 +140,7 @@ class HttpDataset(
             except KeyError as exc:
                 raise ResourceException(
                     message="Failed to resolve URL: missing path parameter",
-                    status_code=None,
+                    status_code=400,
                     details={
                         "type": self.type.value,
                         "url_template": self.settings.url,
@@ -163,10 +163,9 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             CreateError: If the create error occurs.
         """
-        url = self._resolve_url()
-        logger.debug(f"Sending {self.settings.method} request to {url}")
-
         try:
+            url = self._resolve_url()
+            logger.debug(f"Sending {self.settings.method} request to {url}")
             response = self.linked_service.connection.request(
                 method=self.settings.method,
                 url=url,
@@ -204,10 +203,9 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             ReadError: If the read error occurs.
         """
-        url = self._resolve_url()
-        logger.debug(f"Sending {self.settings.method} request to {url}")
-
         try:
+            url = self._resolve_url()
+            logger.debug(f"Sending {self.settings.method} request to {url}")
             response = self.linked_service.connection.request(
                 method=self.settings.method,
                 url=url,
