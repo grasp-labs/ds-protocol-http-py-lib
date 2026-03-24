@@ -134,8 +134,20 @@ class HttpDataset(
 
     def _resolve_url(self) -> str:
         """Resolve the URL by substituting any path parameters."""
-        if self.settings.path_params:
-            return self.settings.url.format(**self.settings.path_params)
+        if self.settings.path_params is not None:
+            try:
+                return self.settings.url.format(**self.settings.path_params)
+            except KeyError as exc:
+                raise ResourceException(
+                    message="Failed to resolve URL: missing path parameter",
+                    status_code=None,
+                    details={
+                        "type": self.type.value,
+                        "url_template": self.settings.url,
+                        "path_params": self.settings.path_params,
+                        "missing_path_param": str(exc),
+                    },
+                ) from exc
         return self.settings.url
 
     def create(self) -> None:

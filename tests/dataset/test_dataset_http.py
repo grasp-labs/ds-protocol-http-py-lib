@@ -385,6 +385,29 @@ def test_read_ignores_extra_path_params_not_present_in_url() -> None:
     assert captured["url"] == "https://api.example.com/documents/abc123/original"
 
 
+def test_read_raises_resource_exception_when_path_param_is_missing() -> None:
+    """
+    It raises ResourceException (not a raw KeyError) when a required placeholder
+    in the URL template has no matching key in path_params.
+    """
+    from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/documents/{document_guid}/original",
+        method=HttpMethod.GET,
+        path_params={},  # missing "document_guid"
+    )
+    connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=b""))
+    linked_service = SimpleNamespace(connection=connection, close=lambda: None)
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+
+    with pytest.raises(ResourceException) as exc_info:
+        dataset.read()
+
+    assert exc_info.value.details["missing_path_param"] == "'document_guid'"
+    assert exc_info.value.details["url_template"] == "https://api.example.com/documents/{document_guid}/original"
+
+
 def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     """
     Ensure `HttpDataset.read` preserves the deserializer result and does not

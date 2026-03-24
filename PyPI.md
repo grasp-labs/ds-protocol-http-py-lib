@@ -45,7 +45,7 @@ linked_service = HttpLinkedService(
         oauth2=OAuth2AuthSettings(
             token_endpoint="https://api.example.com/oauth/token",
             client_id="my-client",
-            client_secret="my-secret",
+            client_secret="******",
         ),
     ),
 )
@@ -71,6 +71,27 @@ df = dataset.output
 Use `{param}` placeholders in the URL and supply their values via `path_params`:
 
 ```python
+import uuid
+from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
+from ds_protocol_http_py_lib.enums import AuthType, HttpMethod
+from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
+from ds_protocol_http_py_lib.linked_service.http import HttpLinkedService, HttpLinkedServiceSettings
+
+linked_service = HttpLinkedService(
+    id=uuid.uuid4(),
+    name="my-linked-service",
+    version="1.0.0",
+    settings=HttpLinkedServiceSettings(
+        host="https://api.example.com",
+        auth_type=AuthType.OAUTH2,
+        oauth2=OAuth2AuthSettings(
+            token_endpoint="https://api.example.com/oauth/token",
+            client_id="my-client",
+            client_secret="******",
+        ),
+    ),
+)
+
 dataset = HttpDataset(
     id=uuid.uuid4(),
     name="my-dataset",
