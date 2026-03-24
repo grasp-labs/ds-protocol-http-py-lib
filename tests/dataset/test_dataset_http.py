@@ -390,8 +390,6 @@ def test_read_raises_resource_exception_when_path_param_is_missing() -> None:
     It raises ResourceException (not a raw KeyError) when a required placeholder
     in the URL template has no matching key in path_params.
     """
-    from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
-
     settings = HttpDatasetSettings(
         url="https://api.example.com/documents/{document_guid}/original",
         method=HttpMethod.GET,
