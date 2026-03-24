@@ -88,6 +88,15 @@ class HttpDatasetSettings(DatasetSettings):
     headers: dict[str, Any] | None = None
     """The headers to send with the request."""
 
+    path_params: dict[str, Any] | None = None
+    """Path parameters to interpolate into the URL template using {param} syntax.
+
+    Example:
+        url="https://api.example.com/documents/{document_guid}/original"
+        path_params={"document_guid": "abc123"}
+        # → https://api.example.com/documents/abc123/original
+    """
+
 
 HttpDatasetSettingsType = TypeVar(
     "HttpDatasetSettingsType",
@@ -123,6 +132,12 @@ class HttpDataset(
     def type(self) -> ResourceType:
         return ResourceType.DATASET
 
+    def _resolve_url(self) -> str:
+        """Resolve the URL by substituting any path parameters."""
+        if self.settings.path_params:
+            return self.settings.url.format(**self.settings.path_params)
+        return self.settings.url
+
     def create(self) -> None:
         """
         Create data at the specified endpoint.
@@ -136,12 +151,13 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             CreateError: If the create error occurs.
         """
-        logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
+        url = self._resolve_url()
+        logger.debug(f"Sending {self.settings.method} request to {url}")
 
         try:
             response = self.linked_service.connection.request(
                 method=self.settings.method,
-                url=self.settings.url,
+                url=url,
                 data=self.settings.data,
                 json=self.settings.json,
                 files=self.settings.files,
@@ -176,12 +192,13 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             ReadError: If the read error occurs.
         """
-        logger.debug(f"Sending {self.settings.method} request to {self.settings.url}")
+        url = self._resolve_url()
+        logger.debug(f"Sending {self.settings.method} request to {url}")
 
         try:
             response = self.linked_service.connection.request(
                 method=self.settings.method,
-                url=self.settings.url,
+                url=url,
                 data=self.settings.data,
                 json=self.settings.json,
                 files=self.settings.files,

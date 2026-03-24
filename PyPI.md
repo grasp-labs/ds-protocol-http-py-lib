@@ -26,13 +26,67 @@ print(f"ds-protocol-http-py-lib version: {__version__}")
 
 ## Usage
 
-<!-- Add usage examples here -->
+### Read from a static URL
 
 ```python
-# Example usage
-import ds_protocol_http_py_lib
+import uuid
+from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
+from ds_protocol_http_py_lib.enums import AuthType, HttpMethod
+from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
+from ds_protocol_http_py_lib.linked_service.http import HttpLinkedService, HttpLinkedServiceSettings
 
-# Your code examples here
+linked_service = HttpLinkedService(
+    id=uuid.uuid4(),
+    name="my-linked-service",
+    version="1.0.0",
+    settings=HttpLinkedServiceSettings(
+        host="https://api.example.com",
+        auth_type=AuthType.OAUTH2,
+        oauth2=OAuth2AuthSettings(
+            token_endpoint="https://api.example.com/oauth/token",
+            client_id="my-client",
+            client_secret="my-secret",
+        ),
+    ),
+)
+
+dataset = HttpDataset(
+    id=uuid.uuid4(),
+    name="my-dataset",
+    version="1.0.0",
+    linked_service=linked_service,
+    settings=HttpDatasetSettings(
+        method=HttpMethod.GET,
+        url="https://api.example.com/data",
+    ),
+)
+
+linked_service.connect()
+dataset.read()
+df = dataset.output
+```
+
+### Read from a URL with path parameters
+
+Use `{param}` placeholders in the URL and supply their values via `path_params`:
+
+```python
+dataset = HttpDataset(
+    id=uuid.uuid4(),
+    name="my-dataset",
+    version="1.0.0",
+    linked_service=linked_service,
+    settings=HttpDatasetSettings(
+        method=HttpMethod.GET,
+        url="https://api.example.com/documents/{document_guid}/original",
+        path_params={"document_guid": "abc123"},
+    ),
+)
+
+linked_service.connect()
+dataset.read()
+df = dataset.output
+# Request is sent to: https://api.example.com/documents/abc123/original
 ```
 
 ## Requirements
