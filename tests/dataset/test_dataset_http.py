@@ -269,6 +269,144 @@ def test_close_delegates_to_linked_service_close() -> None:
     assert linked_service.closed is True
 
 
+def test_read_interpolates_path_params_into_url() -> None:
+    """
+    It substitutes {param} placeholders in the URL with values from path_params before sending.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/documents/{document_guid}/original",
+        method=HttpMethod.GET,
+        path_params={"document_guid": "abc123"},
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["url"] == "https://api.example.com/documents/abc123/original"
+
+
+def test_create_interpolates_path_params_into_url() -> None:
+    """
+    It substitutes {param} placeholders in the URL with values from path_params on create.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/documents/{document_guid}/original",
+        method=HttpMethod.POST,
+        path_params={"document_guid": "xyz789"},
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset.create()
+
+    assert captured["url"] == "https://api.example.com/documents/xyz789/original"
+
+
+def test_read_without_path_params_uses_url_unchanged() -> None:
+    """
+    It sends the URL as-is when path_params is not provided.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(url="https://api.example.com/data", method=HttpMethod.GET)
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["url"] == "https://api.example.com/data"
+
+
+def test_read_interpolates_multiple_path_params_into_url() -> None:
+    """
+    It substitutes multiple {param} placeholders in the URL with values from path_params.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/{org}/{repo}/contents/{path}",
+        method=HttpMethod.GET,
+        path_params={"org": "acme", "repo": "widgets", "path": "README.md"},
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["url"] == "https://api.example.com/acme/widgets/contents/README.md"
+
+
+def test_read_ignores_extra_path_params_not_present_in_url() -> None:
+    """
+    It silently ignores extra keys in path_params that have no matching placeholder in the URL.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/documents/{document_guid}/original",
+        method=HttpMethod.GET,
+        path_params={"document_guid": "abc123", "unused_key": "ignored", "another_extra": "also_ignored"},
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["url"] == "https://api.example.com/documents/abc123/original"
+
+
+def test_read_raises_read_error_when_path_param_is_missing() -> None:
+    """
+    It raises ReadError (not a raw KeyError or bare ResourceException) when a required
+    placeholder in the URL template has no matching key in path_params.  The original
+    diagnostic details are preserved in the ReadError.
+    """
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/documents/{document_guid}/original",
+        method=HttpMethod.GET,
+        path_params={},  # missing "document_guid"
+    )
+    connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=b""))
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+
+    with pytest.raises(ReadError) as exc_info:
+        dataset.read()
+
+    assert exc_info.value.details["missing_path_param"] == "'document_guid'"
+    assert exc_info.value.details["url_template"] == "https://api.example.com/documents/{document_guid}/original"
+
+
 def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     """
     Ensure `HttpDataset.read` preserves the deserializer result and does not
