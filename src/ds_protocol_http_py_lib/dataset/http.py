@@ -137,16 +137,23 @@ class HttpDataset(
         if self.settings.path_params is not None:
             try:
                 return self.settings.url.format(**self.settings.path_params)
-            except KeyError as exc:
+            except (KeyError, ValueError) as exc:
+                # Normalize all URL template resolution issues into a ResourceException
+                details: dict[str, Any] = {
+                    "type": self.type.value,
+                    "url_template": self.settings.url,
+                    "path_params": self.settings.path_params,
+                }
+                message = "Failed to resolve URL: missing path parameter"
+                if isinstance(exc, ValueError):
+                    message = "Failed to resolve URL: invalid URL template"
+                    details["template_error"] = str(exc)
+                else:
+                    details["missing_path_param"] = str(exc)
                 raise ResourceException(
-                    message="Failed to resolve URL: missing path parameter",
+                    message=message,
                     status_code=400,
-                    details={
-                        "type": self.type.value,
-                        "url_template": self.settings.url,
-                        "path_params": self.settings.path_params,
-                        "missing_path_param": str(exc),
-                    },
+                    details=details,
                 ) from exc
         return self.settings.url
 
