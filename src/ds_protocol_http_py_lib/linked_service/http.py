@@ -511,7 +511,11 @@ class HttpLinkedService(
 
         Initializes the Http client instance if not already initialized.
         Configures authentication based on the auth_type.
-        Updates the session headers with the configured headers.
+        Merges configured headers into the session, then applies auth configuration.
+
+        Header precedence:
+        - `settings.headers` are applied first
+        - the selected auth handler may override headers (especially `Authorization`)
 
         Returns:
             None: The session is configured.

@@ -243,6 +243,30 @@ def test_connect_apikey_updates_session_headers() -> None:
     assert service.connection.session.headers["X-API-Key"] == "k"
 
 
+def test_connect_bearer_overrides_authorization_from_settings_headers() -> None:
+    """
+    If settings.headers includes Authorization, the auth handler should win.
+    """
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.BEARER,
+        headers={"Authorization": "UserProvided"},
+        bearer=BearerAuthSettings(
+            token_endpoint="https://example.test/token",
+            username="u",
+            password="p",
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    fake_http = LinkedServiceHttp(
+        _session=type("S", (), {"headers": {}})(),
+        post_response=json_response({"access_token": "tok"}, url="https://example.test/token", method="POST"),
+    )
+    service._http = cast("Any", fake_http)
+    service.connect()
+    assert service.connection.session.headers["Authorization"] == "Bearer tok"
+
+
 def test_connect_apikey_requires_api_key_settings() -> None:
     """
     It raises LinkedServiceException when API key settings are missing.
