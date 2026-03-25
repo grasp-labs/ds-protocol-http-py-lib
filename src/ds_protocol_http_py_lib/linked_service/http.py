@@ -304,7 +304,8 @@ class HttpLinkedService(
             )
 
         url = self.settings.bearer.token_endpoint
-        headers = {"Content-type": "application/json"}
+        headers = dict(self.settings.headers or {})
+        headers.setdefault("Content-Type", "application/json")
         data = {
             self.settings.bearer.username_key_name: self.settings.bearer.username,
             self.settings.bearer.password_key_name: self.settings.bearer.password,
@@ -352,7 +353,8 @@ class HttpLinkedService(
             )
 
         url = self.settings.oauth2.token_endpoint
-        headers = {"Content-type": "application/x-www-form-urlencoded"}
+        headers = dict(self.settings.headers or {})
+        headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
         data = {
             "client_id": self.settings.oauth2.client_id,
             "client_secret": self.settings.oauth2.client_secret,
