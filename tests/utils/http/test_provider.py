@@ -207,6 +207,17 @@ def test_http_request_preserves_explicit_timeout() -> None:
     assert session.last[2]["timeout"] == 5
 
 
+def test_response_info_does_not_require_prepared_request() -> None:
+    """
+    _response_info is for logging and must be best-effort (it must not raise if response.request is missing).
+    """
+    http = Http(config=HttpConfig(timeout_seconds=1), bucket=cast("Any", TrackingBucket()))
+    resp = build_response(status_code=200, url="https://example.test/info", method="GET")
+    resp.request = None  # type: ignore[assignment]
+    info = http._response_info(resp)
+    assert info["status_code"] == 200
+
+
 def test_http_convenience_methods_delegate_to_request() -> None:
     """
     It delegates get/post/put/delete to request with the correct method.

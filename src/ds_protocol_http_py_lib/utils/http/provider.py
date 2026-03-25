@@ -104,20 +104,28 @@ class Http:
         Returns:
             dict[str, Any]: Dictionary containing the response information.
         """
-        info: dict[str, Any] = {
-            "status_code": response.status_code,
-            "url": response.url,
-            "method": response.request.method,
-            "reason": response.reason,
-            "content_type": response.headers.get("Content-Type"),
-            "content_length": response.headers.get("Content-Length"),
-            "request_id": (
-                response.headers.get("X-Request-ID")
-                or response.headers.get("X-Amzn-RequestId")
-                or response.headers.get("X-Correlation-ID")
-            ),
-        }
-        return info
+        try:
+            info: dict[str, Any] = {
+                "status_code": response.status_code,
+                "url": response.url,
+                "method": response.request.method,
+                "reason": response.reason,
+                "content_type": response.headers.get("Content-Type"),
+                "content_length": response.headers.get("Content-Length"),
+                "request_id": (
+                    response.headers.get("X-Request-ID")
+                    or response.headers.get("X-Amzn-RequestId")
+                    or response.headers.get("X-Correlation-ID")
+                ),
+            }
+            return info
+        except AttributeError:
+            logger.warning("Failed to get full response info, returning partial info")
+            return {
+                "status_code": getattr(response, "status_code", None),
+                "url": getattr(response, "url", None),
+                "reason": getattr(response, "reason", None),
+            }
 
     # ---- context ----
     @property
