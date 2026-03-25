@@ -521,6 +521,9 @@ class HttpLinkedService(
         if self._http is None:
             self._http = self._init_http()
 
+        if self.settings.headers:
+            self._http.session.headers.update(self.settings.headers)
+
         handlers = {
             "Bearer": self._configure_bearer_auth,
             "OAuth2": self._configure_oauth2_auth,
@@ -542,9 +545,6 @@ class HttpLinkedService(
                     "valid_auth_types": list(handlers.keys()),
                 },
             ) from exc
-
-        if self.settings.headers:
-            self._http.session.headers.update(self.settings.headers)
 
         self._session = self._http
 

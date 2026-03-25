@@ -172,7 +172,7 @@ def test_http_request_raises_resource_exception_on_unexpected_exception() -> Non
 )
 def test_response_info_handles_various_request_body_types(request_body: Any) -> None:
     """
-    _response_info should safely extract body previews for bytes/str/other types.
+    _response_info should return safe metadata and never include request body previews.
     """
     http = Http(config=HttpConfig(timeout_seconds=1), bucket=cast("Any", TrackingBucket()))
     resp = build_response(
@@ -186,7 +186,8 @@ def test_response_info_handles_various_request_body_types(request_body: Any) -> 
     assert info["status_code"] == 200
     assert info["url"] == "https://example.test/info"
     assert info["method"] == "POST"
-    assert "body" in info
+    assert "body" not in info
+    assert "content" not in info
 
 
 def test_http_request_preserves_explicit_timeout() -> None:
