@@ -96,7 +96,7 @@ class Http:
     def _response_info(self, response: requests.Response) -> dict[str, Any]:
         """
         Get information about a response.
-        Extracts the status code, URL, method, reason, content, and body from the response.
+        Extracts safe metadata only (no request/response bodies).
 
         Args:
             response: The HTTP response object to extract info from.
@@ -104,32 +104,28 @@ class Http:
         Returns:
             dict[str, Any]: Dictionary containing the response information.
         """
-        info = {
-            "status_code": response.status_code,
-            "url": response.url,
-            "method": response.request.method,
-            "reason": response.reason,
-        }
         try:
-            req = response.request
-
-            body = getattr(req, "body", None)
-            if body is not None:
-                if isinstance(body, bytes):
-                    body_preview = body[:500].decode("utf-8", errors="replace")
-                elif isinstance(body, str):
-                    body_preview = body[:500]
-                else:
-                    body_preview = str(body)[:500]
-            else:
-                body_preview = None
-
-            info["content"] = response.content[:500] if response.content is not None else None
-            info["body"] = body_preview
-        except Exception as exc:
-            logger.warning(f"Failed to get full response info: {exc}")
-
-        return info
+            info: dict[str, Any] = {
+                "status_code": response.status_code,
+                "url": response.url,
+                "method": response.request.method,
+                "reason": response.reason,
+                "content_type": response.headers.get("Content-Type"),
+                "content_length": response.headers.get("Content-Length"),
+                "request_id": (
+                    response.headers.get("X-Request-ID")
+                    or response.headers.get("X-Amzn-RequestId")
+                    or response.headers.get("X-Correlation-ID")
+                ),
+            }
+            return info
+        except AttributeError:
+            logger.warning("Failed to get full response info, returning partial info")
+            return {
+                "status_code": getattr(response, "status_code", None),
+                "url": getattr(response, "url", None),
+                "reason": getattr(response, "reason", None),
+            }
 
     # ---- context ----
     @property

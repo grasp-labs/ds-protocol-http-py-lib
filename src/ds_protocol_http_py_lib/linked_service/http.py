@@ -304,7 +304,8 @@ class HttpLinkedService(
             )
 
         url = self.settings.bearer.token_endpoint
-        headers = {"Content-type": "application/json"}
+        headers = dict(self.settings.headers or {})
+        headers.setdefault("Content-Type", "application/json")
         data = {
             self.settings.bearer.username_key_name: self.settings.bearer.username,
             self.settings.bearer.password_key_name: self.settings.bearer.password,
@@ -352,7 +353,8 @@ class HttpLinkedService(
             )
 
         url = self.settings.oauth2.token_endpoint
-        headers = {"Content-type": "application/x-www-form-urlencoded"}
+        headers = dict(self.settings.headers or {})
+        headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
         data = {
             "client_id": self.settings.oauth2.client_id,
             "client_secret": self.settings.oauth2.client_secret,
@@ -509,7 +511,11 @@ class HttpLinkedService(
 
         Initializes the Http client instance if not already initialized.
         Configures authentication based on the auth_type.
-        Updates the session headers with the configured headers.
+        Merges configured headers into the session, then applies auth configuration.
+
+        Header precedence:
+        - `settings.headers` are applied first
+        - the selected auth handler may override headers (especially `Authorization`)
 
         Returns:
             None: The session is configured.
@@ -520,6 +526,9 @@ class HttpLinkedService(
         """
         if self._http is None:
             self._http = self._init_http()
+
+        if self.settings.headers:
+            self._http.session.headers.update(self.settings.headers)
 
         handlers = {
             "Bearer": self._configure_bearer_auth,
@@ -542,9 +551,6 @@ class HttpLinkedService(
                     "valid_auth_types": list(handlers.keys()),
                 },
             ) from exc
-
-        if self.settings.headers:
-            self._http.session.headers.update(self.settings.headers)
 
         self._session = self._http
 

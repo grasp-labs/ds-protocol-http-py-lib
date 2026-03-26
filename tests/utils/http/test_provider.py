@@ -172,7 +172,7 @@ def test_http_request_raises_resource_exception_on_unexpected_exception() -> Non
 )
 def test_response_info_handles_various_request_body_types(request_body: Any) -> None:
     """
-    _response_info should safely extract body previews for bytes/str/other types.
+    _response_info should return safe metadata and never include request body previews.
     """
     http = Http(config=HttpConfig(timeout_seconds=1), bucket=cast("Any", TrackingBucket()))
     resp = build_response(
@@ -186,7 +186,8 @@ def test_response_info_handles_various_request_body_types(request_body: Any) -> 
     assert info["status_code"] == 200
     assert info["url"] == "https://example.test/info"
     assert info["method"] == "POST"
-    assert "body" in info
+    assert "body" not in info
+    assert "content" not in info
 
 
 def test_http_request_preserves_explicit_timeout() -> None:
@@ -204,6 +205,17 @@ def test_http_request_preserves_explicit_timeout() -> None:
     http.request("GET", url, timeout=5)
     assert session.last is not None
     assert session.last[2]["timeout"] == 5
+
+
+def test_response_info_does_not_require_prepared_request() -> None:
+    """
+    _response_info is for logging and must be best-effort (it must not raise if response.request is missing).
+    """
+    http = Http(config=HttpConfig(timeout_seconds=1), bucket=cast("Any", TrackingBucket()))
+    resp = build_response(status_code=200, url="https://example.test/info", method="GET")
+    resp.request = None  # type: ignore[assignment]
+    info = http._response_info(resp)
+    assert info["status_code"] == 200
 
 
 def test_http_convenience_methods_delegate_to_request() -> None:
