@@ -63,20 +63,14 @@ def main() -> pd.DataFrame:
         ),
     )
 
-    frames = []
     try:
         dataset.linked_service.connect()
-        while dataset.next:
-            dataset.read()
-            logger.debug("Dataset next: %s", dataset.next)
-            logger.debug("Schema: %s", dataset.schema)
-            frames.append(dataset.output)
-            break
+        dataset.read()
     except ResourceException as exc:
         logger.error(f"Error reading dataset: {exc.__dict__}")
         return pd.DataFrame()
 
-    return pd.concat(frames)
+    return dataset.output
 
 
 def main_with_path_params() -> pd.DataFrame:
@@ -103,7 +97,6 @@ def main_with_path_params() -> pd.DataFrame:
     try:
         dataset.linked_service.connect()
         dataset.read()
-        logger.debug("Schema: %s", dataset.schema)
         return dataset.output
     except ResourceException as exc:
         logger.error(f"Error reading dataset: {exc.__dict__}")
