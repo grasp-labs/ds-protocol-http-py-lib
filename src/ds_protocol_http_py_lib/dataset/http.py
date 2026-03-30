@@ -32,6 +32,7 @@ Example:
     >>> data = dataset.output
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Generic, NoReturn, TypeVar
 
@@ -57,6 +58,7 @@ from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 
 from ..enums import HttpMethod, ResourceType
 from ..linked_service.http import HttpLinkedService
+from ..models import Files
 
 logger = Logger.get_logger(__name__, package=True)
 
@@ -82,8 +84,8 @@ class HttpDatasetSettings(DatasetSettings):
     params: dict[str, Any] | None = None
     """The parameters to send with the request."""
 
-    files: list[Any] | None = None
-    """The files to send with the request."""
+    files: list[Files] | None = None
+    """The multipart files to send with the request."""
 
     headers: dict[str, Any] | None = None
     """The headers to send with the request."""
@@ -178,7 +180,7 @@ class HttpDataset(
                 url=url,
                 data=self.settings.data,
                 json=self.settings.json,
-                files=self.settings.files,
+                files=self._map_files(self.settings.files),
                 params=self.settings.params,
                 headers=self.settings.headers,
             )
@@ -218,7 +220,7 @@ class HttpDataset(
                 url=url,
                 data=self.settings.data,
                 json=self.settings.json,
-                files=self.settings.files,
+                files=self._map_files(self.settings.files),
                 params=self.settings.params,
                 headers=self.settings.headers,
             )
@@ -272,6 +274,19 @@ class HttpDataset(
         List entity using http.
         """
         raise NotSupportedError("List operation is not supported for Http datasets")
+
+    def _map_files(self, files: Sequence[Files] | None) -> Any:
+        """
+        Convert typed `Files` descriptors into `requests` compatible `files=...`.
+
+        `HttpDatasetSettings.files` is expected to already be deserialized
+        into the correct typed model, so this method focuses purely on the
+        `requests` shape conversion.
+        """
+        if not files:
+            return None
+
+        return [(file.field, file.to_requests_file_tuple()) for file in files]
 
     def close(self) -> None:
         """
