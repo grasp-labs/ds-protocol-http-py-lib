@@ -57,8 +57,6 @@ def main() -> pd.DataFrame:
     try:
         dataset.linked_service.connect()
         dataset.create()
-        logger.debug("Dataset next: %s", dataset.next)
-        logger.debug("Schema: %s", dataset.schema)
         return dataset.output
     except ResourceException as exc:
         logger.error(f"Error reading dataset: {exc.__dict__}")

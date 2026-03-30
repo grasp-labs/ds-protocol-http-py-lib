@@ -30,6 +30,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.enums import HttpMethod, ResourceType
+from ds_protocol_http_py_lib.models import Files
 from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService
 
 
@@ -122,6 +123,233 @@ def test_create_sets_empty_dataframe_when_response_has_no_content() -> None:
     dataset.create()
     assert isinstance(dataset.output, pd.DataFrame)
     assert dataset.output.empty is True
+
+
+def test_files_descriptor_is_mapped_to_requests_files() -> None:
+    """
+    HttpDataset maps JSON-friendly file descriptors into requests-compatible `files`.
+    """
+    content_bytes = b"id,name\n1,alice\n"
+
+    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
+    linked_service = LinkedService(http=http)
+    props = HttpDatasetSettings(
+        url="https://example.test/data",
+        files=[Files(filename="test.pdf", content=content_bytes, content_type="application/pdf")],
+    )
+
+    deserializer = DeserializerStub()
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="test-dataset",
+        version="1.0.0",
+        linked_service=cast("Any", linked_service),
+        settings=props,
+        deserializer=cast("Any", deserializer),
+    )
+    linked_service.connect()
+    dataset.read()
+
+    assert http.last_request is not None
+    assert http.last_request["files"] == [("file", ("test.pdf", content_bytes, "application/pdf"))]
+
+
+def test_files_mapping_non_list_is_passed_through() -> None:
+    """
+    `HttpDatasetSettings.files` is typed; non-list input is out-of-contract.
+    """
+    linked_service = cast(
+        "Any",
+        SimpleNamespace(
+            connection=SimpleNamespace(request=lambda **_kwargs: SimpleNamespace(content=b"")),
+            close=lambda: None,
+        ),
+    )
+    settings = HttpDatasetSettings(url="https://example.test/data", files=cast("Any", {"x": 1}))
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+
+    with pytest.raises(AttributeError):
+        dataset.read()
+
+
+def test_files_mapping_empty_list_is_passed_through() -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(url="https://example.test/data", files=[])
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] is None
+
+
+def test_files_mapping_mixed_list_is_passed_through() -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://example.test/data",
+        files=[
+            Files(field="upload", filename="a.txt", content=b"abc"),
+            Files(field="download", filename="b.txt", content=b"def"),
+        ],
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [
+        ("upload", ("a.txt", b"abc")),
+        ("download", ("b.txt", b"def")),
+    ]
+
+
+def test_files_mapping_rejects_empty_field() -> None:
+    """
+    The model respects custom `field` names.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://example.test/data",
+        files=[Files(field="upload", filename="a.txt", content=b"abc")],
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [("upload", ("a.txt", b"abc"))]
+
+
+def test_files_mapping_rejects_empty_filename() -> None:
+    """
+    String `content` is used as the multipart file content.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(url="https://example.test/data", files=[Files(filename="a.txt", content=b"abc")])
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [("file", ("a.txt", b"abc"))]
+
+
+def test_files_mapping_rejects_non_string_content_type() -> None:
+    """
+    `content_type` produces a 3-tuple file part.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://example.test/data",
+        files=[Files(filename="a.txt", content=b"abc", content_type="text/plain")],
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [("file", ("a.txt", b"abc", "text/plain"))]
+
+
+def test_files_mapping_sends_bytes_content() -> None:
+    """
+    Bytes `content` is sent as-is.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(url="https://example.test/data", files=[Files(filename="a.txt", content=b"abc")])
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [("file", ("a.txt", b"abc"))]
+
+
+def test_files_mapping_sends_bytes_content_with_field_override() -> None:
+    # Valid `field` override.
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://example.test/data",
+        files=[Files(field="upload", filename="a.txt", content=b"abc")],
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [("upload", ("a.txt", b"abc"))]
+
+
+def test_files_mapping_without_content_type_and_duplicate_field() -> None:
+    """
+    - If `content_type` is missing, the tuple is (filename, bytes)
+    - If two items share the same `field`, we build a list of tuples.
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(content=b"")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://example.test/data",
+        files=[
+            Files(filename="a.txt", content=b"hello"),
+            Files(filename="b.txt", content=b"world"),
+        ],
+    )
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+    dataset.read()
+
+    assert captured["files"] == [
+        ("file", ("a.txt", b"hello")),
+        ("file", ("b.txt", b"world")),
+    ]
 
 
 def test_read_sets_defaults_when_response_has_no_content() -> None:
@@ -287,7 +515,7 @@ def test_read_interpolates_path_params_into_url() -> None:
         method=HttpMethod.GET,
         path_params={"document_guid": "abc123"},
     )
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
     dataset.read()
 
     assert captured["url"] == "https://api.example.com/documents/abc123/original"
@@ -311,7 +539,7 @@ def test_create_interpolates_path_params_into_url() -> None:
         method=HttpMethod.POST,
         path_params={"document_guid": "xyz789"},
     )
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
     dataset.create()
 
     assert captured["url"] == "https://api.example.com/documents/xyz789/original"
@@ -331,7 +559,7 @@ def test_read_without_path_params_uses_url_unchanged() -> None:
     linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
 
     settings = HttpDatasetSettings(url="https://api.example.com/data", method=HttpMethod.GET)
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
     dataset.read()
 
     assert captured["url"] == "https://api.example.com/data"
@@ -355,7 +583,7 @@ def test_read_interpolates_multiple_path_params_into_url() -> None:
         method=HttpMethod.GET,
         path_params={"org": "acme", "repo": "widgets", "path": "README.md"},
     )
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
     dataset.read()
 
     assert captured["url"] == "https://api.example.com/acme/widgets/contents/README.md"
@@ -379,7 +607,7 @@ def test_read_ignores_extra_path_params_not_present_in_url() -> None:
         method=HttpMethod.GET,
         path_params={"document_guid": "abc123", "unused_key": "ignored", "another_extra": "also_ignored"},
     )
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
     dataset.read()
 
     assert captured["url"] == "https://api.example.com/documents/abc123/original"
@@ -398,7 +626,7 @@ def test_read_raises_read_error_when_path_param_is_missing() -> None:
     )
     connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=b""))
     linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
 
     with pytest.raises(ReadError) as exc_info:
         dataset.read()
@@ -414,13 +642,13 @@ def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     """
     content = b'{"x": [1]}'
     connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=content))
-    linked_service = SimpleNamespace(connection=connection, close=lambda: None)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
 
     settings = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.GET)
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=1, name="test", version="1.0.0")
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
 
     expected = pd.DataFrame({"x": [1]})
-    dataset.deserializer = lambda c: expected
+    dataset.deserializer = cast("Any", lambda c: expected)
 
     dataset.read()
 

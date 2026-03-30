@@ -481,10 +481,11 @@ wheels = [
 
 [[package]]
 name = "ds-protocol-http-py-lib"
-version = "0.1.0b6"
+version = "0.1.0b7"
 source = { editable = "." }
 dependencies = [
     { name = "ds-common-logger-py-lib" },
+    { name = "ds-common-serde-py-lib" },
     { name = "ds-resource-plugin-py-lib" },
     { name = "pandas" },
     { name = "requests" },
@@ -525,6 +526,7 @@ requires-dist = [
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.9.3" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "ds-common-logger-py-lib", specifier = ">=0.1.0a5,<1.0.0" },
+    { name = "ds-common-serde-py-lib", specifier = ">=0.1.0b1,<1.0.0" },
     { name = "ds-resource-plugin-py-lib", specifier = ">=0.1.0rc1,<1.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.7.0" },
     { name = "pandas", specifier = ">=2.2.0,<3.0.0" },
