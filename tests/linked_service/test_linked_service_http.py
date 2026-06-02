@@ -397,6 +397,86 @@ def test_connect_custom_sets_bearer_authorization_header(token_payloads) -> None
     assert service.connection.session.headers["Authorization"] == "Bearer t3"
 
 
+def test_connect_custom_defaults_to_json_payload_when_content_type_missing(token_payloads) -> None:
+    """
+    It uses json payload for backward compatibility when Content-Type is not set.
+    """
+
+    captured: dict[str, Any] = {}
+
+    class SpyHttp:
+        def __init__(self) -> None:
+            self._session = type("S", (), {"headers": {}})()
+
+        def post(self, url: str, **kwargs: Any) -> Any:
+            captured["url"] = url
+            captured["kwargs"] = kwargs
+            return json_response(token_payloads["flat_token"], url=url, method="POST")
+
+        @property
+        def session(self) -> Any:
+            return self._session
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.CUSTOM,
+        headers=None,
+        custom=CustomAuthSettings(
+            token_endpoint="https://example.test/token",
+            data={"x": "y"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    service._http = cast("Any", SpyHttp())
+
+    service.connect()
+
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
+    assert "json" in captured["kwargs"]
+    assert captured["kwargs"]["json"] == {"x": "y"}
+    assert "data" not in captured["kwargs"]
+
+
+def test_connect_custom_uses_form_payload_for_form_content_type(token_payloads) -> None:
+    """
+    It uses form data payload when Content-Type is application/x-www-form-urlencoded.
+    """
+
+    captured: dict[str, Any] = {}
+
+    class SpyHttp:
+        def __init__(self) -> None:
+            self._session = type("S", (), {"headers": {}})()
+
+        def post(self, url: str, **kwargs: Any) -> Any:
+            captured["url"] = url
+            captured["kwargs"] = kwargs
+            return json_response(token_payloads["flat_token"], url=url, method="POST")
+
+        @property
+        def session(self) -> Any:
+            return self._session
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.CUSTOM,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        custom=CustomAuthSettings(
+            token_endpoint="https://example.test/token",
+            data={"x": "y"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    service._http = cast("Any", SpyHttp())
+
+    service.connect()
+
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
+    assert "data" in captured["kwargs"]
+    assert captured["kwargs"]["data"] == {"x": "y"}
+    assert "json" not in captured["kwargs"]
+
+
 def test_connect_custom_raises_when_access_token_is_missing() -> None:
     """
     It raises AuthenticationError when the token endpoint response does not include a token.

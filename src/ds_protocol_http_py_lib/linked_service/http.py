@@ -121,6 +121,9 @@ class OAuth2AuthSettings:
     scope: str | None = None
     """Optional OAuth2 scope(s)."""
 
+    data: dict[str, str] | None = None
+    """Custom data to send with the token request."""
+
 
 @dataclass(kw_only=True)
 class CustomAuthSettings:
@@ -135,7 +138,7 @@ class CustomAuthSettings:
     """The URL to fetch the token from."""
 
     data: dict[str, str] | None = None
-    """Custom JSON data to send with the token request."""
+    """Custom token request data sent as JSON or form-encoded based on Content-Type."""
 
 
 @dataclass(kw_only=True)
@@ -216,6 +219,23 @@ class HttpLinkedService(
 
     _session: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
     _http: Http | None = field(default=None, init=False, repr=False, metadata={"serialize": False})
+
+    @staticmethod
+    def _is_json_content_type(content_type: str | None) -> bool:
+        """
+        Check whether a Content-Type header indicates a JSON payload.
+
+        Args:
+            content_type: Content-Type header value.
+
+        Returns:
+            bool: True when the media type is JSON-compatible.
+        """
+        if not content_type:
+            return False
+
+        normalized = content_type.split(";", 1)[0].strip().lower()
+        return normalized == "application/json" or normalized.endswith("+json")
 
     def __post_init__(self) -> None:
         self.base_uri = (
@@ -361,6 +381,8 @@ class HttpLinkedService(
             "scope": self.settings.oauth2.scope,
             "grant_type": "client_credentials",
         }
+        if self.settings.oauth2.data:
+            data.update(self.settings.oauth2.data)
 
         response = http.post(
             url=url,
@@ -472,11 +494,19 @@ class HttpLinkedService(
                 details={"type": self.type.value},
             )
 
+        headers = dict(self.settings.headers or {})
+        content_type = headers.get("Content-Type") or headers.get("content-type")
+        payload_arg = (
+            {"json": self.settings.custom.data}
+            if self._is_json_content_type(content_type) or content_type is None
+            else {"data": self.settings.custom.data}
+        )
+
         response = http.post(
             url=self.settings.custom.token_endpoint,
             headers=self.settings.headers,
-            json=self.settings.custom.data,
             timeout=30,
+            **payload_arg,
         )
         token = find_keys_in_json(response.json(), {"access_token", "accessToken", "token"})
         if token is None:
