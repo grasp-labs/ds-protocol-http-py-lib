@@ -183,6 +183,56 @@ def test_fetch_oauth2_token_extracts_token_from_json(token_payloads) -> None:
     assert token == "t2"
 
 
+def test_fetch_oauth2_token_merges_extra_data_into_form_payload(token_payloads) -> None:
+    """
+    It merges OAuth2AuthSettings.data into the form-encoded token request body.
+    """
+
+    captured: dict[str, Any] = {}
+
+    class SpyHttp:
+        def __init__(self) -> None:
+            self._session = type("S", (), {"headers": {}})()
+
+        def post(self, url: str, **kwargs: Any) -> Any:
+            captured["url"] = url
+            captured["kwargs"] = kwargs
+            return json_response(token_payloads["flat_token"], url=url, method="POST")
+
+        @property
+        def session(self) -> Any:
+            return self._session
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.OAUTH2,
+        oauth2=OAuth2AuthSettings(
+            token_endpoint="https://example.test/token",
+            client_id="id",
+            client_secret="secret",
+            scope="s",
+            data={"audience": "api", "resource": "urn:example"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+
+    token = service._fetch_oauth2_token(cast("Any", SpyHttp()))
+
+    assert token == "t3"
+    assert captured["url"] == "https://example.test/token"
+    post_kwargs = captured["kwargs"]
+    assert "data" in post_kwargs
+    assert "json" not in post_kwargs
+    assert post_kwargs["data"] == {
+        "client_id": "id",
+        "client_secret": "secret",
+        "scope": "s",
+        "grant_type": "client_credentials",
+        "audience": "api",
+        "resource": "urn:example",
+    }
+
+
 def test_fetch_oauth2_token_requires_oauth2_settings() -> None:
     """
     It raises LinkedServiceException when OAuth2 settings are missing.
@@ -461,6 +511,46 @@ def test_connect_custom_uses_form_payload_for_form_content_type(token_payloads) 
         host="api.example.test",
         auth_type=AuthType.CUSTOM,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
+        custom=CustomAuthSettings(
+            token_endpoint="https://example.test/token",
+            data={"x": "y"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    service._http = cast("Any", SpyHttp())
+
+    service.connect()
+
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
+    assert "data" in captured["kwargs"]
+    assert captured["kwargs"]["data"] == {"x": "y"}
+    assert "json" not in captured["kwargs"]
+
+
+def test_connect_custom_uses_form_payload_for_mixed_case_content_type_header(token_payloads) -> None:
+    """
+    It uses form data payload when Content-Type header name uses mixed casing.
+    """
+
+    captured: dict[str, Any] = {}
+
+    class SpyHttp:
+        def __init__(self) -> None:
+            self._session = type("S", (), {"headers": {}})()
+
+        def post(self, url: str, **kwargs: Any) -> Any:
+            captured["url"] = url
+            captured["kwargs"] = kwargs
+            return json_response(token_payloads["flat_token"], url=url, method="POST")
+
+        @property
+        def session(self) -> Any:
+            return self._session
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.CUSTOM,
+        headers={"Content-type": "application/x-www-form-urlencoded"},
         custom=CustomAuthSettings(
             token_endpoint="https://example.test/token",
             data={"x": "y"},

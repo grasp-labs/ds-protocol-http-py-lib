@@ -495,7 +495,10 @@ class HttpLinkedService(
             )
 
         headers = dict(self.settings.headers or {})
-        content_type = headers.get("Content-Type") or headers.get("content-type")
+        content_type = next(
+            (value for key, value in headers.items() if key.lower() == "content-type"),
+            None,
+        )
         payload_arg = (
             {"json": self.settings.custom.data}
             if self._is_json_content_type(content_type) or content_type is None
@@ -504,7 +507,7 @@ class HttpLinkedService(
 
         response = http.post(
             url=self.settings.custom.token_endpoint,
-            headers=self.settings.headers,
+            headers=headers,
             timeout=30,
             **payload_arg,
         )
