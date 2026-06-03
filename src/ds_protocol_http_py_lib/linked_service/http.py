@@ -122,7 +122,7 @@ class OAuth2AuthSettings:
     """Optional OAuth2 scope(s)."""
 
     data: dict[str, str] | None = None
-    """Custom data to send with the token request."""
+    """Extra form fields for the token request; cannot override client_id, client_secret, scope, or grant_type."""
 
 
 @dataclass(kw_only=True)
@@ -235,7 +235,7 @@ class HttpLinkedService(
             return False
 
         normalized = content_type.split(";", 1)[0].strip().lower()
-        return normalized == "application/json" or normalized.endswith("+json")
+        return normalized == "application/json" or normalized.endswith("json")
 
     def __post_init__(self) -> None:
         self.base_uri = (
@@ -382,7 +382,7 @@ class HttpLinkedService(
             "grant_type": "client_credentials",
         }
         if self.settings.oauth2.data:
-            data.update(self.settings.oauth2.data)
+            data = {**self.settings.oauth2.data, **data}
 
         response = http.post(
             url=url,

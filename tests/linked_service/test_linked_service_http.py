@@ -60,6 +60,25 @@ def spy_http(token_payloads: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
     return cast("Any", SpyHttp()), captured
 
 
+@pytest.mark.parametrize(
+    ("content_type", "expected"),
+    [
+        ("application/json", True),
+        ("application/json; charset=utf-8", True),
+        ("application/problem+json", True),
+        ("text/json", True),
+        ("application/x-www-form-urlencoded", False),
+        (None, False),
+    ],
+)
+def test_is_json_content_type(content_type: str | None, expected: bool) -> None:
+    """
+    It treats standard and legacy JSON Content-Type values as JSON payloads.
+    """
+
+    assert HttpLinkedService._is_json_content_type(content_type) is expected
+
+
 def test_post_init_builds_base_uri_from_schema_and_host() -> None:
     """
     It prefixes schema when host has no explicit scheme.
@@ -241,6 +260,44 @@ def test_fetch_oauth2_token_merges_extra_data_into_form_payload(spy_http: tuple[
         "grant_type": "client_credentials",
         "audience": "api",
         "resource": "urn:example",
+    }
+
+
+def test_fetch_oauth2_token_required_fields_override_extra_data(spy_http: tuple[Any, dict[str, Any]]) -> None:
+    """
+    It keeps client_id, client_secret, scope, and grant_type from settings when extra data repeats those keys.
+    """
+
+    http, captured = spy_http
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.OAUTH2,
+        oauth2=OAuth2AuthSettings(
+            token_endpoint="https://example.test/token",
+            client_id="id",
+            client_secret="secret",
+            scope="s",
+            data={
+                "client_id": "override",
+                "client_secret": "override",
+                "scope": "override",
+                "grant_type": "password",
+                "audience": "api",
+            },
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+
+    token = service._fetch_oauth2_token(http)
+
+    assert token == "t3"
+    assert captured["kwargs"]["data"] == {
+        "client_id": "id",
+        "client_secret": "secret",
+        "scope": "s",
+        "grant_type": "client_credentials",
+        "audience": "api",
     }
 
 
