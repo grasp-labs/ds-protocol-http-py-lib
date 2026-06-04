@@ -36,6 +36,49 @@ from ds_protocol_http_py_lib.linked_service.http import (
 from tests.mocks import LinkedServiceHttp, json_response
 
 
+@pytest.fixture
+def spy_http(token_payloads: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """
+    Http stand-in that records post() kwargs and returns a flat token JSON response.
+    """
+
+    captured: dict[str, Any] = {}
+
+    class SpyHttp:
+        def __init__(self) -> None:
+            self._session = type("S", (), {"headers": {}})()
+
+        def post(self, url: str, **kwargs: Any) -> Any:
+            captured["url"] = url
+            captured["kwargs"] = kwargs
+            return json_response(token_payloads["flat_token"], url=url, method="POST")
+
+        @property
+        def session(self) -> Any:
+            return self._session
+
+    return cast("Any", SpyHttp()), captured
+
+
+@pytest.mark.parametrize(
+    ("content_type", "expected"),
+    [
+        ("application/json", True),
+        ("application/json; charset=utf-8", True),
+        ("application/problem+json", True),
+        ("text/json", True),
+        ("application/x-www-form-urlencoded", False),
+        (None, False),
+    ],
+)
+def test_is_json_content_type(content_type: str | None, expected: bool) -> None:
+    """
+    It treats standard and legacy JSON Content-Type values as JSON payloads.
+    """
+
+    assert HttpLinkedService._is_json_content_type(content_type) is expected
+
+
 def test_post_init_builds_base_uri_from_schema_and_host() -> None:
     """
     It prefixes schema when host has no explicit scheme.
@@ -181,6 +224,81 @@ def test_fetch_oauth2_token_extracts_token_from_json(token_payloads) -> None:
     fake_http = LinkedServiceHttp(_session=type("S", (), {"headers": {}})(), post_response=response)
     token = service._fetch_oauth2_token(cast("Any", fake_http))
     assert token == "t2"
+
+
+def test_fetch_oauth2_token_merges_extra_data_into_form_payload(spy_http: tuple[Any, dict[str, Any]]) -> None:
+    """
+    It merges OAuth2AuthSettings.data into the form-encoded token request body.
+    """
+
+    http, captured = spy_http
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.OAUTH2,
+        oauth2=OAuth2AuthSettings(
+            token_endpoint="https://example.test/token",
+            client_id="id",
+            client_secret="secret",
+            scope="s",
+            data={"audience": "api", "resource": "urn:example"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+
+    token = service._fetch_oauth2_token(http)
+
+    assert token == "t3"
+    assert captured["url"] == "https://example.test/token"
+    post_kwargs = captured["kwargs"]
+    assert "data" in post_kwargs
+    assert "json" not in post_kwargs
+    assert post_kwargs["data"] == {
+        "client_id": "id",
+        "client_secret": "secret",
+        "scope": "s",
+        "grant_type": "client_credentials",
+        "audience": "api",
+        "resource": "urn:example",
+    }
+
+
+def test_fetch_oauth2_token_required_fields_override_extra_data(spy_http: tuple[Any, dict[str, Any]]) -> None:
+    """
+    It keeps client_id, client_secret, scope, and grant_type from settings when extra data repeats those keys.
+    """
+
+    http, captured = spy_http
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.OAUTH2,
+        oauth2=OAuth2AuthSettings(
+            token_endpoint="https://example.test/token",
+            client_id="id",
+            client_secret="secret",
+            scope="s",
+            data={
+                "client_id": "override",
+                "client_secret": "override",
+                "scope": "override",
+                "grant_type": "password",
+                "audience": "api",
+            },
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+
+    token = service._fetch_oauth2_token(http)
+
+    assert token == "t3"
+    assert captured["kwargs"]["data"] == {
+        "client_id": "id",
+        "client_secret": "secret",
+        "scope": "s",
+        "grant_type": "client_credentials",
+        "audience": "api",
+    }
 
 
 def test_fetch_oauth2_token_requires_oauth2_settings() -> None:
@@ -395,6 +513,91 @@ def test_connect_custom_sets_bearer_authorization_header(token_payloads) -> None
     )
     service.connect()
     assert service.connection.session.headers["Authorization"] == "Bearer t3"
+
+
+def test_connect_custom_defaults_to_json_payload_when_content_type_missing(
+    spy_http: tuple[Any, dict[str, Any]],
+) -> None:
+    """
+    It uses json payload for backward compatibility when Content-Type is not set.
+    """
+
+    http, captured = spy_http
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.CUSTOM,
+        headers=None,
+        custom=CustomAuthSettings(
+            token_endpoint="https://example.test/token",
+            data={"x": "y"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    service._http = http
+
+    service.connect()
+
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
+    assert "json" in captured["kwargs"]
+    assert captured["kwargs"]["json"] == {"x": "y"}
+    assert "data" not in captured["kwargs"]
+
+
+def test_connect_custom_uses_form_payload_for_form_content_type(spy_http: tuple[Any, dict[str, Any]]) -> None:
+    """
+    It uses form data payload when Content-Type is application/x-www-form-urlencoded.
+    """
+
+    http, captured = spy_http
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.CUSTOM,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        custom=CustomAuthSettings(
+            token_endpoint="https://example.test/token",
+            data={"x": "y"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    service._http = http
+
+    service.connect()
+
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
+    assert "data" in captured["kwargs"]
+    assert captured["kwargs"]["data"] == {"x": "y"}
+    assert "json" not in captured["kwargs"]
+
+
+def test_connect_custom_uses_form_payload_for_mixed_case_content_type_header(
+    spy_http: tuple[Any, dict[str, Any]],
+) -> None:
+    """
+    It uses form data payload when Content-Type header name uses mixed casing.
+    """
+
+    http, captured = spy_http
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.CUSTOM,
+        headers={"Content-type": "application/x-www-form-urlencoded"},
+        custom=CustomAuthSettings(
+            token_endpoint="https://example.test/token",
+            data={"x": "y"},
+        ),
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    service._http = http
+
+    service.connect()
+
+    assert service.connection.session.headers["Authorization"] == "Bearer t3"
+    assert "data" in captured["kwargs"]
+    assert captured["kwargs"]["data"] == {"x": "y"}
+    assert "json" not in captured["kwargs"]
 
 
 def test_connect_custom_raises_when_access_token_is_missing() -> None:
