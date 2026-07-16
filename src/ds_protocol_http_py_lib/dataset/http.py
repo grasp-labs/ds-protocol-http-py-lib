@@ -84,7 +84,7 @@ class HttpDatasetSettings(DatasetSettings):
     params: dict[str, Any] | None = None
     """The parameters to send with the request."""
 
-    paginate: bool = False
+    auto_paginate: bool = False
     """When True, `read()` automatically advances `offset` until the source is exhausted."""
 
     files: list[Files] | None = None
@@ -215,7 +215,7 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             ReadError: If the read error occurs.
         """
-        if self.settings.paginate:
+        if self.settings.auto_paginate:
             self.output = self._read_paginated()
             return
 

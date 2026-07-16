@@ -678,7 +678,7 @@ def test_read_paginates_when_limit_is_configured() -> None:
 
     settings = HttpDatasetSettings(
         url="https://api.example.com/data",
-        paginate=True,
+        auto_paginate=True,
         params={"limit": 2, "offset": 4, "filter": "active"},
     )
     dataset = HttpDataset(
@@ -701,7 +701,7 @@ def test_read_paginates_when_limit_is_configured() -> None:
 
 def test_read_does_not_paginate_by_default_when_limit_is_configured() -> None:
     """
-    `limit` alone should not trigger pagination unless `paginate` is enabled.
+    `limit` alone should not trigger pagination unless `auto_paginate` is enabled.
     """
     captured: list[dict[str, Any]] = []
 

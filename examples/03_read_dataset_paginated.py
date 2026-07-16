@@ -65,7 +65,7 @@ def main() -> pd.DataFrame:
         settings=HttpDatasetSettings(
             method=HttpMethod.GET,
             url="http://example.com/items",
-            paginate=True,
+            auto_paginate=True,
             params={
                 "limit": 100,
                 "offset": 0,
