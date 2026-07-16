@@ -84,6 +84,9 @@ class HttpDatasetSettings(DatasetSettings):
     params: dict[str, Any] | None = None
     """The parameters to send with the request."""
 
+    paginate: bool = False
+    """When True, `read()` automatically advances `offset` until the source is exhausted."""
+
     files: list[Files] | None = None
     """The multipart files to send with the request."""
 
@@ -212,6 +215,36 @@ class HttpDataset(
             ConnectionError: If the connection fails.
             ReadError: If the read error occurs.
         """
+        if self.settings.paginate:
+            self.output = self._read_paginated()
+            return
+
+        self.output = self._read_single_page(dict(self.settings.params or {}))
+
+    def _read_paginated(self) -> pd.DataFrame:
+        params = dict(self.settings.params or {})
+        limit = self._pagination_limit(params)
+        if limit is None:
+            return self._read_single_page(params)
+
+        offset = self._pagination_offset(params)
+        frames: list[pd.DataFrame] = []
+
+        while True:
+            page_params = dict(params)
+            page_params["limit"] = limit
+            page_params["offset"] = offset
+            frame = self._read_single_page(page_params)
+            frames.append(frame)
+
+            if frame.empty or len(frame) < limit:
+                break
+
+            offset += limit
+
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+    def _read_single_page(self, params: dict[str, Any]) -> pd.DataFrame:
         try:
             url = self._resolve_url()
             logger.debug(f"Sending {self.settings.method} request to {url}")
@@ -221,7 +254,7 @@ class HttpDataset(
                 data=self.settings.data,
                 json=self.settings.json,
                 files=self._map_files(self.settings.files),
-                params=self.settings.params,
+                params=params,
                 headers=self.settings.headers,
             )
         except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
@@ -235,9 +268,28 @@ class HttpDataset(
             ) from exc
 
         if response.content and self.deserializer:
-            self.output = self.deserializer(response.content)
-        else:
-            self.output = pd.DataFrame()
+            return self.deserializer(response.content)
+        return pd.DataFrame()
+
+    @staticmethod
+    def _pagination_limit(params: dict[str, Any]) -> int | None:
+        limit = params.get("limit")
+        if limit is None:
+            return None
+        try:
+            parsed_limit = int(limit)
+        except (TypeError, ValueError):
+            return None
+        return parsed_limit if parsed_limit > 0 else None
+
+    @staticmethod
+    def _pagination_offset(params: dict[str, Any]) -> int:
+        offset = params.get("offset", 0)
+        try:
+            parsed_offset = int(offset)
+        except (TypeError, ValueError):
+            return 0
+        return parsed_offset if parsed_offset >= 0 else 0
 
     def delete(self) -> NoReturn:
         """

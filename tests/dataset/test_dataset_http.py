@@ -653,3 +653,80 @@ def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     dataset.read()
 
     pdt.assert_frame_equal(dataset.output, expected)
+
+
+def test_read_paginates_when_limit_is_configured() -> None:
+    """
+    It keeps requesting pages until the returned page is shorter than the configured limit.
+    """
+    captured: list[dict[str, Any]] = []
+    payloads = [b"page-1", b"page-2"]
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.append(dict(kwargs))
+        return SimpleNamespace(content=payloads.pop(0))
+
+    def deserialize(payload: bytes) -> pd.DataFrame:
+        if payload == b"page-1":
+            return pd.DataFrame({"id": [1, 2]})
+        if payload == b"page-2":
+            return pd.DataFrame({"id": [3]})
+        return pd.DataFrame()
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/data",
+        paginate=True,
+        params={"limit": 2, "offset": 4, "filter": "active"},
+    )
+    dataset = HttpDataset(
+        linked_service=linked_service,
+        settings=settings,
+        id=uuid.uuid4(),
+        name="test",
+        version="1.0.0",
+        deserializer=cast("Any", deserialize),
+    )
+
+    dataset.read()
+
+    assert len(captured) == 2
+    assert captured[0]["params"] == {"limit": 2, "offset": 4, "filter": "active"}
+    assert captured[1]["params"] == {"limit": 2, "offset": 6, "filter": "active"}
+    assert isinstance(dataset.output, pd.DataFrame)
+    pdt.assert_frame_equal(dataset.output.reset_index(drop=True), pd.DataFrame({"id": [1, 2, 3]}))
+
+
+def test_read_does_not_paginate_by_default_when_limit_is_configured() -> None:
+    """
+    `limit` alone should not trigger pagination unless `paginate` is enabled.
+    """
+    captured: list[dict[str, Any]] = []
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        captured.append(dict(kwargs))
+        return SimpleNamespace(content=b"page-1")
+
+    connection = SimpleNamespace(request=fake_request)
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/data",
+        params={"limit": 2, "offset": 4},
+    )
+    dataset = HttpDataset(
+        linked_service=linked_service,
+        settings=settings,
+        id=uuid.uuid4(),
+        name="test",
+        version="1.0.0",
+        deserializer=cast("Any", lambda payload: pd.DataFrame({"id": [1, 2]})),
+    )
+
+    dataset.read()
+
+    assert len(captured) == 1
+    assert captured[0]["params"] == {"limit": 2, "offset": 4}
+    pdt.assert_frame_equal(dataset.output.reset_index(drop=True), pd.DataFrame({"id": [1, 2]}))
