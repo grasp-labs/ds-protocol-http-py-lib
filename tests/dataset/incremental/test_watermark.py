@@ -63,14 +63,14 @@ def test_commit_raises_on_incomparable_watermark_types() -> None:
         commit({}, output, settings)
 
 
-def test_commit_formats_timestamp_date_and_datetime() -> None:
-    """Timestamp watermarks use date ISO when midnight, else full ISO."""
+def test_commit_formats_timestamp_as_full_isoformat() -> None:
+    """Timestamp watermarks always use full ISO (including midnight)."""
     settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")
 
     midnight = pd.DataFrame([{"updated_at": pd.Timestamp("2024-03-01")}])
     checkpoint: dict = {}
     commit(checkpoint, midnight, settings)
-    assert checkpoint["incremental"]["watermark"] == "2024-03-01"
+    assert checkpoint["incremental"]["watermark"] == "2024-03-01T00:00:00"
 
     daytime = pd.DataFrame([{"updated_at": pd.Timestamp("2024-03-01 15:30:00")}])
     checkpoint = {}

@@ -83,10 +83,6 @@ def commit(
         ) from exc
 
     if isinstance(watermark, pd.Timestamp):
-        watermark = (
-            watermark.date().isoformat()
-            if watermark.hour == watermark.minute == watermark.second == 0 and watermark.nanosecond == 0
-            else watermark.isoformat()
-        )
+        watermark = watermark.isoformat()
 
     checkpoint[_CHECKPOINT_KEY] = {_WATERMARK_KEY: watermark}
