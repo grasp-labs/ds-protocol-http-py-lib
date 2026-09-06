@@ -1,6 +1,6 @@
 """
-**File:** ``test_dataset_http.py``
-**Region:** ``tests/dataset/test_dataset_http``
+**File:** ``test_http.py``
+**Region:** ``tests/dataset/test_http``
 
 HttpDataset behavior tests.
 
@@ -8,7 +8,7 @@ Covers:
 - Connection initialization via explicit connect() call.
 - create/read request execution and argument propagation.
 - Serializer/deserializer interactions and empty-response handling.
-- Pagination state updates (next/cursor) driven by the deserializer.
+- Path-parameter URL resolution and error mapping.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.enums import HttpMethod, ResourceType
 from ds_protocol_http_py_lib.models import Files
+from tests.dataset.helpers import json_response, linked_service
 from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService
 
 
@@ -653,3 +654,38 @@ def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     dataset.read()
 
     pdt.assert_frame_equal(dataset.output, expected)
+
+
+def test_supports_checkpoint_false_without_read_features() -> None:
+    """Default settings do not advertise checkpoint support."""
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(lambda **_: json_response({"data": []})),
+        settings=HttpDatasetSettings(url="https://example.test/data"),
+    )
+    assert dataset.supports_checkpoint is False
+
+
+def test_single_request_unchanged_without_pagination() -> None:
+    """Absent pagination keeps the historical single-request behavior."""
+    calls = {"n": 0}
+
+    def fake_request(**kwargs: Any) -> SimpleNamespace:
+        calls["n"] += 1
+        return json_response({"ok": True})
+
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(fake_request),
+        settings=HttpDatasetSettings(url="https://example.test/data"),
+        deserializer=lambda content: pd.DataFrame(  # type: ignore[arg-type]
+            [{"raw": content.decode()}],
+        ),
+    )
+    dataset.read()
+    assert calls["n"] == 1
+    assert dataset.supports_checkpoint is False
