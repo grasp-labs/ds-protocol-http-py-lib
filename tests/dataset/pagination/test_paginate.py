@@ -232,12 +232,12 @@ def test_incremental_with_pagination_resets_page_on_success() -> None:
             return json_response(
                 {
                     "data": [
-                        {"id": 1, "updated_at": "2024-02-01"},
-                        {"id": 2, "updated_at": "2024-02-02"},
+                        {"id": 1, "updated_at": "2024-02-01T00:00:00"},
+                        {"id": 2, "updated_at": "2024-02-02T00:00:00"},
                     ],
                 },
             )
-        return json_response({"data": [{"id": 3, "updated_at": "2024-02-03"}]})
+        return json_response({"data": [{"id": 3, "updated_at": "2024-02-03T00:00:00"}]})
 
     dataset = HttpDataset(
         id=uuid.uuid4(),
@@ -257,7 +257,7 @@ def test_incremental_with_pagination_resets_page_on_success() -> None:
             ),
         ),
         checkpoint={
-            "incremental": {"watermark": "2024-01-01"},
+            "incremental": {"watermark": "2024-01-01T00:00:00"},
             "pagination": {
                 "strategy": "offset",
                 "offset": 0,
@@ -268,7 +268,7 @@ def test_incremental_with_pagination_resets_page_on_success() -> None:
     )
     dataset.read()
     assert "pagination" not in dataset.checkpoint
-    assert dataset.checkpoint["incremental"]["watermark"] == "2024-02-03"
+    assert dataset.checkpoint["incremental"]["watermark"] == "2024-02-03T00:00:00"
     assert len(dataset.output) == 3
 
 

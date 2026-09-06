@@ -60,11 +60,11 @@ def test_incremental_watermark_advances_only_on_success() -> None:
                 ),
             ),
         ),
-        checkpoint={"incremental": {"watermark": "2024-01-01"}},
+        checkpoint={"incremental": {"watermark": "2024-01-05T00:00:00"}},
     )
     dataset.read()
-    assert seen == ["2024-01-01"]
-    assert dataset.checkpoint["incremental"]["watermark"] == "2024-01-05"
+    assert seen == ["2024-01-05T00:00:00"]
+    assert dataset.checkpoint["incremental"]["watermark"] == "2024-01-05T00:00:00"
 
 
 def test_apply_requires_incremental_settings() -> None:
