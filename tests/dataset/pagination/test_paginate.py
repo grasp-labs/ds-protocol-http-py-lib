@@ -91,11 +91,7 @@ def test_offset_failure_persists_pagination_resume_state() -> None:
                     items_path="data",
                     offset=OffsetPaginationSettings(page_size=2, total_path="meta.total"),
                 ),
-                incremental=IncrementalSettings(
-                    param="updated_since",
-                    watermark_path="id",
-                    initial_watermark=0,
-                ),
+                incremental=IncrementalSettings(param="updated_since", watermark_path="id"),
             ),
         ),
         checkpoint={"incremental": {"watermark": 10}},
@@ -257,11 +253,7 @@ def test_incremental_with_pagination_resets_page_on_success() -> None:
                     items_path="data",
                     offset=OffsetPaginationSettings(page_size=2),
                 ),
-                incremental=IncrementalSettings(
-                    param="updated_since",
-                    watermark_path="updated_at",
-                    initial_watermark="2024-01-01",
-                ),
+                incremental=IncrementalSettings(param="updated_since", watermark_path="updated_at"),
             ),
         ),
         checkpoint={

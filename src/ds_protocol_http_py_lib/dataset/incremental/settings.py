@@ -9,12 +9,10 @@ Example:
     ...     param="updated_since",
     ...     location=InjectLocation.QUERY,
     ...     watermark_path="updated_at",
-    ...     initial_watermark="2024-01-01",
     ... )
 """
 
 from dataclasses import dataclass
-from typing import Any
 
 from ds_common_serde_py_lib import Serializable
 
@@ -29,7 +27,8 @@ class IncrementalSettings(Serializable):
     Instruction (stable): which request slot carries the lower bound and which
     response field advances the high-watermark.
 
-    State (runtime): the watermark value itself lives in ``checkpoint``.
+    State (runtime): the watermark value itself lives in ``checkpoint``, owned
+    by the caller. This library only reads it on inject and writes it on commit.
     """
 
     param: str
@@ -40,6 +39,3 @@ class IncrementalSettings(Serializable):
 
     watermark_path: str
     """Dotted path on each output row used to compute the new high-watermark."""
-
-    initial_watermark: Any | None = None
-    """Optional seed used when the checkpoint has no prior watermark."""

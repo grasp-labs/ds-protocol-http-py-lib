@@ -8,7 +8,6 @@ Example:
     >>> dataset.settings.read.incremental = IncrementalSettings(
     ...     param="updated_since",
     ...     watermark_path="updated_at",
-    ...     initial_watermark="2024-01-01",
     ... )
     >>> dataset.read()  # delegates here when only incremental is configured
 """

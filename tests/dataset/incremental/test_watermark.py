@@ -30,7 +30,7 @@ def _request() -> RequestSnapshot:
 
 
 def test_inject_returns_unchanged_when_watermark_absent() -> None:
-    """No checkpoint watermark and no initial seed leaves the request untouched."""
+    """Absent checkpoint watermark leaves the request untouched (full load)."""
     settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")
     request = _request()
     assert inject(request, {}, settings) is request

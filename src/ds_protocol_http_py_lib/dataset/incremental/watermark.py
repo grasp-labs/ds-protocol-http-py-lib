@@ -27,14 +27,16 @@ def inject(
     settings: IncrementalSettings,
 ) -> RequestSnapshot:
     """
-    Apply the prior watermark to the request.
+    Apply the caller-provided watermark from ``checkpoint`` to the request.
 
-    Prefers ``checkpoint["incremental"]["watermark"]``; falls back to
-    ``settings.initial_watermark``. Returns ``request`` unchanged when both
-    are absent.
+    Reads ``checkpoint["incremental"]["watermark"]``. If absent, returns
+    ``request`` unchanged (full load — no lower-bound param injected).
     """
     slice_ = checkpoint.get(_CHECKPOINT_KEY)
-    watermark = slice_[_WATERMARK_KEY] if isinstance(slice_, dict) and _WATERMARK_KEY in slice_ else settings.initial_watermark
+    if not isinstance(slice_, dict) or _WATERMARK_KEY not in slice_:
+        return request
+
+    watermark = slice_[_WATERMARK_KEY]
     if watermark is None:
         return request
 

@@ -16,7 +16,9 @@ import pandas as pd
 import pytest
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import ReadError
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
-from ds_resource_plugin_py_lib.common.resource.linked_service.errors import AuthenticationError
+from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
+    AuthenticationError,
+)
 
 from ds_protocol_http_py_lib.dataset.http import (
     HttpDataset,
@@ -92,11 +94,7 @@ def test_apply_maps_resource_exception_to_read_error() -> None:
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
-                incremental=IncrementalSettings(
-                    param="updated_since",
-                    watermark_path="updated_at",
-                    initial_watermark="2024-01-01",
-                ),
+                incremental=IncrementalSettings(param="updated_since", watermark_path="updated_at"),
             ),
         ),
     )
@@ -120,11 +118,7 @@ def test_apply_rethrows_authentication_error() -> None:
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
-                incremental=IncrementalSettings(
-                    param="updated_since",
-                    watermark_path="updated_at",
-                    initial_watermark="2024-01-01",
-                ),
+                incremental=IncrementalSettings(param="updated_since", watermark_path="updated_at"),
             ),
         ),
     )
@@ -146,11 +140,7 @@ def test_apply_empty_content_yields_empty_dataframe() -> None:
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
-                incremental=IncrementalSettings(
-                    param="updated_since",
-                    watermark_path="updated_at",
-                    initial_watermark="2024-01-01",
-                ),
+                incremental=IncrementalSettings(param="updated_since", watermark_path="updated_at"),
             ),
         ),
     )
