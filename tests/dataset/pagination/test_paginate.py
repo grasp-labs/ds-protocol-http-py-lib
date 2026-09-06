@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+import pandas as pd
 import pytest
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import ReadError
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
@@ -345,3 +346,64 @@ def test_paginate_requires_pagination_settings() -> None:
     )
     with pytest.raises(ValueError, match=r"requires settings\.read\.pagination"):
         paginate(dataset)
+
+
+def test_paginate_rejects_non_dict_pagination_checkpoint() -> None:
+    """Corrupted pagination checkpoint slices become ReadError."""
+
+    def fake_request(**kwargs: Any) -> Any:
+        raise AssertionError("request should not be issued")
+
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(fake_request),
+        settings=HttpDatasetSettings(
+            url="https://example.test/orders",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.OFFSET,
+                    items_path="data",
+                    offset=OffsetPaginationSettings(page_size=2),
+                ),
+            ),
+        ),
+        checkpoint={"pagination": "not-a-dict"},
+    )
+    with pytest.raises(ReadError, match="must be a dict"):
+        dataset.read()
+
+
+def test_paginate_root_items_path_passes_raw_response_to_deserializer() -> None:
+    """items_path '$' deserializes response.content like a single-request read."""
+    seen: list[Any] = []
+
+    def fake_request(**kwargs: Any) -> Any:
+        return json_response([{"id": 1}, {"id": 2}])
+
+    def capture_deserializer(content: Any) -> pd.DataFrame:
+        seen.append(content)
+        return pd.DataFrame([{"id": 1}, {"id": 2}])
+
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(fake_request),
+        settings=HttpDatasetSettings(
+            url="https://example.test/orders",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.OFFSET,
+                    items_path="$",
+                    offset=OffsetPaginationSettings(page_size=10),
+                ),
+            ),
+        ),
+        deserializer=capture_deserializer,  # type: ignore[arg-type]
+    )
+    dataset.read()
+    assert len(seen) == 1
+    assert isinstance(seen[0], (bytes, bytearray))
+    assert list(dataset.output["id"]) == [1, 2]

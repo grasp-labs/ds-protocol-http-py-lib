@@ -18,7 +18,11 @@ if TYPE_CHECKING:
     from ..settings import CursorPaginationSettings
 
 
-def _read_next_cursor(body: Any, headers: Any, cfg: CursorPaginationSettings) -> str | None:
+def _read_next_cursor(
+    body: Any,
+    headers: Any,
+    cfg: CursorPaginationSettings,
+) -> str | None:
     if cfg.cursor_source is ExtractSource.HEADER:
         return extract_header(headers, cfg.cursor_path)
     value = extract_path(body, cfg.cursor_path)
@@ -51,11 +55,14 @@ class CursorPaginationStrategy:
     ) -> RequestSnapshot:
         out = request.clone()
         # Page size is always a query parameter (independent of cursor_location).
-        if cfg.page_size_param is not None and cfg.page_size is not None:
+        # Prefer the value restored from checkpoint / state over settings so
+        # mid-run resume keeps the same page size.
+        page_size = state.values.get("page_size", cfg.page_size)
+        if cfg.page_size_param is not None and page_size is not None:
             out = inject_value(
                 out,
                 name=cfg.page_size_param,
-                value=cfg.page_size,
+                value=page_size,
                 location=InjectLocation.QUERY,
             )
         cursor = state.values["cursor"]
@@ -83,7 +90,10 @@ class CursorPaginationStrategy:
         if previous is not None and nxt == previous:
             raise ValueError("Cursor pagination made no progress (identical next cursor)")
         return PageState(
-            values={"cursor": nxt, "page_size": cfg.page_size},
+            values={
+                "cursor": nxt,
+                "page_size": state.values.get("page_size", cfg.page_size),
+            },
             page_index=state.page_index + 1,
         )
 

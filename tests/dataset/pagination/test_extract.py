@@ -48,7 +48,13 @@ def test_extract_items_missing_and_non_list() -> None:
 
 def test_extract_header_case_insensitive_empty_and_coercion() -> None:
     """Header lookup is case-insensitive; empty/None become None; non-str is coerced."""
-    headers = {"X-Other": "skip", "X-Next": "tok", "X-Empty": "", "X-None": None, "X-Num": 42}
+    headers = {
+        "X-Other": "skip",
+        "X-Next": "tok",
+        "X-Empty": "",
+        "X-None": None,
+        "X-Num": 42,
+    }
     assert extract_header(headers, "x-next") == "tok"
     assert extract_header(headers, "x-empty") is None
     assert extract_header(headers, "x-none") is None

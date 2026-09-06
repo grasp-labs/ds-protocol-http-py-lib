@@ -102,8 +102,9 @@ class PaginationSettings(Serializable):
     """
     Declared pagination mechanism and strategy-specific nests.
 
-    Exactly one strategy nest must be set to match ``strategy``. Validation
-    runs in ``__post_init__`` so handlers can trust ``strategy_config``.
+    Provide the nest matching ``strategy`` (same pattern as auth nests on
+    ``HttpLinkedServiceSettings``). Other nests should be omitted from the
+    payload; only the selected nest is read at runtime.
     """
 
     strategy: PaginationStrategy
@@ -131,6 +132,7 @@ class PaginationSettings(Serializable):
     """Required when ``strategy`` is ``cursor``."""
 
     def __post_init__(self) -> None:
+        # Surfaces as DeserializationError when constructed via Serializable.deserialize.
         if self._selected_nest() is None:
             raise ValueError(
                 f"PaginationSettings.{self.strategy.value} is required when strategy is '{self.strategy.value}'",

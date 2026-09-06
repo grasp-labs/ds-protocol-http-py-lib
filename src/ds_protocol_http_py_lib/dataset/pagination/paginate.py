@@ -46,11 +46,39 @@ def _validate_checkpoint_strategy(
 ) -> None:
     if checkpoint_slice is None:
         return
+    if not isinstance(checkpoint_slice, dict):
+        raise ValueError(
+            f"checkpoint['pagination'] must be a dict (got {type(checkpoint_slice).__name__})",
+        )
     actual = checkpoint_slice.get("strategy")
     if actual is not None and actual != expected:
         raise ValueError(
             f"Checkpoint pagination strategy '{actual}' does not match configured strategy '{expected}'",
         )
+
+
+def _page_deserializer_input(
+    *,
+    response_content: bytes | str | None,
+    items: list[Any],
+    items_path: str,
+) -> Any:
+    """
+    Build the payload passed to ``dataset.deserializer`` for one page.
+
+    - ``items_path`` of ``$`` / ``""``: use raw ``response.content`` (same as a
+      single-request read of a root array).
+    - Otherwise: JSON-encode the extracted record list so pages concatenate as
+      tabular rows (envelope fields are only used for pagination control).
+    """
+    if items_path in ("$", ""):
+        return response_content
+    return json.dumps(items).encode("utf-8")
+
+
+def _concat_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    """Concatenate page frames, or return an empty frame when none were fetched."""
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
 def paginate(dataset: HttpDataset[Any, Any]) -> None:
@@ -105,7 +133,15 @@ def paginate(dataset: HttpDataset[Any, Any]) -> None:
             body = parse_json_body(response.content)
             items = extract_items(body, pagination.items_path)
             frames.append(
-                dataset.deserializer(json.dumps(items).encode("utf-8")) if dataset.deserializer else pd.DataFrame(items),
+                dataset.deserializer(
+                    _page_deserializer_input(
+                        response_content=response.content,
+                        items=items,
+                        items_path=pagination.items_path,
+                    ),
+                )
+                if dataset.deserializer
+                else pd.DataFrame(items),
             )
 
             if strategy.should_stop(
@@ -136,25 +172,25 @@ def paginate(dataset: HttpDataset[Any, Any]) -> None:
                 },
             )
 
-        dataset.output = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        dataset.output = _concat_frames(frames)
         if incremental is not None:
             commit_incremental(dataset.checkpoint, dataset.output, incremental)
         else:
             dataset.checkpoint.pop("pagination", None)
 
     except (AuthenticationError, AuthorizationError, ConnectionError, ReadError):
-        dataset.output = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        dataset.output = _concat_frames(frames)
         raise
     except ResourceException as exc:
-        dataset.output = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        dataset.output = _concat_frames(frames)
         exc.details.update({"type": dataset.type.value})
         raise ReadError(
             message=exc.message,
             status_code=exc.status_code,
             details=exc.details,
         ) from exc
-    except (KeyError, TypeError, ValueError) as exc:
-        dataset.output = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        dataset.output = _concat_frames(frames)
         raise ReadError(
             message=str(exc),
             status_code=400,

@@ -141,12 +141,16 @@ def test_cursor_resumes_from_checkpoint() -> None:
         {
             "strategy": "cursor",
             "cursor": "tok-resume",
-            "page_size": 10,
+            "page_size": 25,
             "page_index": 1,
         },
     )
     assert restored.values["cursor"] == "tok-resume"
+    assert restored.values["page_size"] == 25
     assert restored.page_index == 1
+    injected = strategy.inject(_base_request(), restored, cfg)
+    assert injected.params["limit"] == 25
+    assert injected.params["cursor"] == "tok-resume"
     assert (
         strategy.from_checkpoint(
             {"cursor": "tok-2", "page_size": 10, "page_index": 2},

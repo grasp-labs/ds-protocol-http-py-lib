@@ -12,7 +12,10 @@ from typing import Any, cast
 import pytest
 
 from ds_protocol_http_py_lib.dataset.pagination import InjectLocation
-from ds_protocol_http_py_lib.dataset.pagination.inject import RequestSnapshot, inject_value
+from ds_protocol_http_py_lib.dataset.pagination.inject import (
+    RequestSnapshot,
+    inject_value,
+)
 from ds_protocol_http_py_lib.enums import HttpMethod
 
 
