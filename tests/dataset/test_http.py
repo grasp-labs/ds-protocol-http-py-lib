@@ -636,6 +636,27 @@ def test_read_raises_read_error_when_path_param_is_missing() -> None:
     assert exc_info.value.details["url_template"] == "https://api.example.com/documents/{document_guid}/original"
 
 
+def test_read_raises_read_error_when_url_template_is_invalid() -> None:
+    """
+    It raises ReadError when path_params are present but the URL template is malformed
+    (ValueError from str.format), preserving template_error details.
+    """
+    settings = HttpDatasetSettings(
+        url="https://api.example.com/documents/{document_guid",
+        method=HttpMethod.GET,
+        path_params={"document_guid": "abc123"},
+    )
+    connection = SimpleNamespace(request=lambda **kwargs: SimpleNamespace(content=b""))
+    linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
+    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
+
+    with pytest.raises(ReadError) as exc_info:
+        dataset.read()
+
+    assert "template_error" in exc_info.value.details
+    assert exc_info.value.details["url_template"] == "https://api.example.com/documents/{document_guid"
+
+
 def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     """
     Ensure `HttpDataset.read` preserves the deserializer result and does not

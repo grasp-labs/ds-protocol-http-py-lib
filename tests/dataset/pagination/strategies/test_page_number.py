@@ -51,3 +51,25 @@ def test_page_number_inject_and_total_pages() -> None:
         state=state,
         cfg=cfg,
     )
+
+
+def test_page_number_resumes_from_checkpoint() -> None:
+    """initial_state restores page/size/index via from_checkpoint."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.PAGE_NUMBER,
+        page_number=PageNumberPaginationSettings(page_size=50, start_page=1),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.PAGE_NUMBER)
+    restored = strategy.initial_state(
+        cfg,
+        {"strategy": "page_number", "page": 3, "page_size": 50, "page_index": 2},
+    )
+    assert restored.values == {"page": 3, "page_size": 50}
+    assert restored.page_index == 2
+    assert (
+        strategy.from_checkpoint(
+            {"page": 4, "page_size": 50, "page_index": 3},
+        ).values["page"]
+        == 4
+    )

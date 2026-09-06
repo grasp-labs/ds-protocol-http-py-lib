@@ -27,6 +27,7 @@ from ds_protocol_http_py_lib.dataset.pagination import (
     PaginationSettings,
     PaginationStrategy,
 )
+from ds_protocol_http_py_lib.dataset.pagination.paginate import paginate
 from ds_protocol_http_py_lib.enums import HttpMethod
 from tests.dataset.helpers import json_response, linked_service
 
@@ -339,3 +340,16 @@ def test_checkpoint_strategy_mismatch_raises() -> None:
     )
     with pytest.raises(ReadError, match="does not match"):
         dataset.read()
+
+
+def test_paginate_requires_pagination_settings() -> None:
+    """Calling paginate without pagination settings raises ValueError."""
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(lambda **_: json_response({"data": []})),
+        settings=HttpDatasetSettings(url="https://example.test/orders"),
+    )
+    with pytest.raises(ValueError, match=r"requires settings\.read\.pagination"):
+        paginate(dataset)

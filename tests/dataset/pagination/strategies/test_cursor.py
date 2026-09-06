@@ -106,3 +106,50 @@ def test_cursor_header_source_and_no_progress() -> None:
             state=state,
             cfg=cfg,
         )
+
+
+def test_cursor_omits_page_size_when_unset() -> None:
+    """When page_size_param is None, inject skips the limit query param."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.CURSOR,
+        cursor=CursorPaginationSettings(
+            cursor_path="next",
+            cursor_param="cursor",
+        ),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.CURSOR)
+    state = strategy.initial_state(cfg, None)
+    injected = strategy.inject(_base_request(), state, cfg)
+    assert injected.params == {"q": "x"}
+
+
+def test_cursor_resumes_from_checkpoint() -> None:
+    """initial_state restores cursor/size/index via from_checkpoint."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.CURSOR,
+        cursor=CursorPaginationSettings(
+            cursor_path="next",
+            page_size_param="limit",
+            page_size=10,
+        ),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.CURSOR)
+    restored = strategy.initial_state(
+        cfg,
+        {
+            "strategy": "cursor",
+            "cursor": "tok-resume",
+            "page_size": 10,
+            "page_index": 1,
+        },
+    )
+    assert restored.values["cursor"] == "tok-resume"
+    assert restored.page_index == 1
+    assert (
+        strategy.from_checkpoint(
+            {"cursor": "tok-2", "page_size": 10, "page_index": 2},
+        ).values["cursor"]
+        == "tok-2"
+    )
