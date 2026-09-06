@@ -101,7 +101,6 @@ def main() -> pd.DataFrame:
                     param="updated_since",
                     location=InjectLocation.QUERY,
                     watermark_path="updated_at",
-                    initial_watermark="1970-01-01T00:00:00Z",
                 ),
                 # Traversing scope: walk pages inside this incremental window.
                 pagination=PaginationSettings(
@@ -131,7 +130,9 @@ def main() -> pd.DataFrame:
         # Failure example:
         #   incremental watermark UNCHANGED
         #   pagination holds next offset for resume within the same window
-        logger.error("Error reading dataset: %s (checkpoint=%s)", exc, dataset.checkpoint)
+        logger.error(
+            "Error reading dataset: %s (checkpoint=%s)", exc, dataset.checkpoint
+        )
         return pd.DataFrame()
 
     return dataset.output
