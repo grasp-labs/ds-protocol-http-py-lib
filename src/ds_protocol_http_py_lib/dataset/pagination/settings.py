@@ -19,7 +19,8 @@ from typing import Union, cast
 
 from ds_common_serde_py_lib import Serializable
 
-from .enums import ExtractSource, InjectLocation, PaginationStrategy
+from ...utils.http.request import InjectLocation
+from .enums import ExtractSource, PaginationStrategy
 
 StrategyConfig = Union[
     "OffsetPaginationSettings",

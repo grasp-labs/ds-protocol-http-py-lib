@@ -2,7 +2,7 @@
 **File:** ``enums.py``
 **Region:** ``ds_protocol_http_py_lib/dataset/pagination/enums``
 
-Pagination strategy and location enums.
+Pagination strategy and extract-source enums.
 """
 
 from enum import StrEnum
@@ -19,19 +19,6 @@ class PaginationStrategy(StrEnum):
 
     CURSOR = "cursor"
     """Opaque cursor / token pagination."""
-
-
-class InjectLocation(StrEnum):
-    """Where a pagination or watermark value is injected into the request."""
-
-    QUERY = "query"
-    """Query string parameter."""
-
-    HEADER = "header"
-    """Request header."""
-
-    BODY = "body"
-    """JSON request body field."""
 
 
 class ExtractSource(StrEnum):

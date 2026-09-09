@@ -63,9 +63,8 @@ from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 from ..enums import HttpMethod, ResourceType
 from ..linked_service.http import HttpLinkedService
 from ..models import Files
-from .incremental.apply import apply
 from .incremental.settings import IncrementalSettings
-from .pagination.paginate import paginate
+from .pagination.paginate import Paginate
 from .pagination.settings import PaginationSettings
 
 logger = Logger.get_logger(__name__, package=True)
@@ -77,14 +76,14 @@ class HttpReadSettings(Serializable):
     Operation-scoped settings for ``HttpDataset.read()``.
 
     - ``pagination`` — traversing scope within one read (absent = single request).
-    - ``incremental`` — shifting scope across runs via a checkpoint watermark.
+    - ``incremental`` — watermark ruleset consulted by Paginate (not a separate gate).
     """
 
     pagination: PaginationSettings | None = None
     """Pagination mechanism. ``None`` means a single request with no page loop."""
 
     incremental: IncrementalSettings | None = None
-    """Incremental watermark strategy. ``None`` means full loads only."""
+    """Incremental watermark rules for Paginate. Ignored when pagination is unset."""
 
 
 @dataclass(kw_only=True)
@@ -150,9 +149,8 @@ class HttpDataset(
 
     ``read()`` behavior is gated by ``settings.read``:
 
-    - pagination configured → multi-page traversal (optional watermark)
-    - incremental only → single request with watermark inject/commit
-    - neither → original single-request read
+    - pagination configured → :class:`Paginate` (optional incremental rules)
+    - otherwise → original single-request read
     """
 
     linked_service: HttpLinkedServiceType
@@ -178,9 +176,8 @@ class HttpDataset(
 
     @property
     def supports_checkpoint(self) -> bool:
-        """True when pagination resume and/or incremental watermarking is configured."""
-        read = self.settings.read
-        return read.pagination is not None or read.incremental is not None
+        """True when pagination (mid-run resume / optional watermark) is configured."""
+        return self.settings.read.pagination is not None
 
     def _resolve_url(self) -> str:
         """Resolve the URL by substituting any path parameters."""
@@ -248,9 +245,8 @@ class HttpDataset(
         """
         Read data from the specified endpoint.
 
-        When ``settings.read.pagination`` is set, delegates to the pagination
-        loop. When only ``settings.read.incremental`` is set, delegates to the
-        incremental single-request path. Otherwise issues one request.
+        When ``settings.read.pagination`` is set, runs
+        ``Paginate.from_dataset(self).run(self)``. Otherwise issues one request.
 
         Raises:
             AuthenticationError: If authentication fails.
@@ -259,11 +255,7 @@ class HttpDataset(
             ReadError: If the read call or pagination fails.
         """
         if self.settings.read.pagination is not None:
-            paginate(self)
-            return
-
-        if self.settings.read.incremental is not None:
-            apply(self)
+            Paginate.from_dataset(self).run(self)
             return
 
         try:

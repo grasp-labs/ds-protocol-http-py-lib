@@ -7,15 +7,15 @@ Opt-in registry for pagination strategy handlers.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .base import PaginationStrategyHandler
     from .enums import PaginationStrategy
+    from .strategies.base import PaginationStrategyHandler
 
-_STRATEGY_REGISTRY: dict[PaginationStrategy, PaginationStrategyHandler] = {}
+_STRATEGY_REGISTRY: dict[PaginationStrategy, PaginationStrategyHandler[Any]] = {}
 
 T = TypeVar("T", bound=type)
 
@@ -25,7 +25,7 @@ def register(strategy: PaginationStrategy) -> Callable[[T], T]:
     Class decorator that registers a strategy handler.
 
     Adding a new strategy is backward compatible: register a new enum member
-    and handler module without changing the paginate loop.
+    and handler module without changing Paginate.
     """
 
     def decorator(cls: T) -> T:
@@ -37,7 +37,7 @@ def register(strategy: PaginationStrategy) -> Callable[[T], T]:
     return decorator
 
 
-def get_strategy(strategy: PaginationStrategy) -> PaginationStrategyHandler:
+def get_strategy(strategy: PaginationStrategy) -> PaginationStrategyHandler[Any]:
     """
     Resolve a registered strategy handler.
 

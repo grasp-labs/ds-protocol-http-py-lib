@@ -2,25 +2,55 @@
 **File:** ``page_number.py``
 **Region:** ``ds_protocol_http_py_lib/dataset/pagination/strategies/page_number``
 
-Page-number / page-size pagination strategy.
+Page-number / page-size strategy.
+
+When to use (arbitrary API)
+    Pick this if the API asks for a **page index**, e.g. ``?page=1&per_page=50``,
+    ``?pageNumber=2&pageSize=25``, ``?p=0&size=100``. You advance
+    ``page += 1``. Set ``start_page`` to whatever the API uses (0 or 1).
+
+    Prefer **offset** if the API uses row skip/limit instead of page numbers.
+    Prefer **cursor** if the API returns a next-token — safer when rows are
+    inserted/deleted between requests.
+
+Intent
+    Client-derived page ordinals. Stop on a short/empty page, or when
+    ``page >= total_pages`` if ``total_pages_path`` is set.
+
+Boundaries
+    Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
+    (``page``, ``page_size``, ``page_index``). Does not own HTTP, watermarks, or
+    clearing pagination on success — :class:`Paginate` does.
+
+Example::
+
+    PaginationSettings(
+        strategy=PaginationStrategy.PAGE_NUMBER,
+        items_path="results",
+        page_number=PageNumberPaginationSettings(
+            page_size=50,
+            start_page=1,
+            total_pages_path="meta.pages",  # optional
+        ),
+    )
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..base import is_short_or_empty_page
+from ....utils.json_utils import get_path
 from ..enums import PaginationStrategy
-from ..extract import extract_path
-from ..inject import PageState, RequestSnapshot, inject_value
 from ..registry import register
+from ..settings import PageNumberPaginationSettings
+from .base import PageState, PaginationStrategyHandler, is_short_or_empty_page
 
 if TYPE_CHECKING:
-    from ..settings import PageNumberPaginationSettings
+    from ....utils.http.request import RequestSnapshot
 
 
 @register(PaginationStrategy.PAGE_NUMBER)
-class PageNumberPaginationStrategy:
+class PageNumberPaginationStrategy(PaginationStrategyHandler[PageNumberPaginationSettings]):
     """Client-derived page ordinal pagination: ``page(n+1) = page(n) + 1``."""
 
     def initial_state(
@@ -41,17 +71,15 @@ class PageNumberPaginationStrategy:
         state: PageState,
         cfg: PageNumberPaginationSettings,
     ) -> RequestSnapshot:
-        out = inject_value(
-            request,
-            name=cfg.page_param,
-            value=state.values["page"],
-            location=cfg.inject_location,
+        out = request.inject(
+            cfg.page_param,
+            state.values["page"],
+            cfg.inject_location,
         )
-        return inject_value(
-            out,
-            name=cfg.page_size_param,
-            value=state.values["page_size"],
-            location=cfg.inject_location,
+        return out.inject(
+            cfg.page_size_param,
+            state.values["page_size"],
+            cfg.inject_location,
         )
 
     def advance(
@@ -86,7 +114,7 @@ class PageNumberPaginationStrategy:
             return True
         if cfg.total_pages_path is None:
             return False
-        total_pages = extract_path(body, cfg.total_pages_path)
+        total_pages = get_path(body, cfg.total_pages_path)
         return total_pages is not None and state.values["page"] >= int(total_pages)
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:

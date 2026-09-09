@@ -2,20 +2,62 @@
 **File:** ``cursor.py``
 **Region:** ``ds_protocol_http_py_lib/dataset/pagination/strategies/cursor``
 
-Opaque cursor / token pagination strategy.
+Opaque cursor / token page strategy.
+
+When to use (arbitrary API)
+    Pick this if the API **gives you the next position** — a token in the body
+    or a header — and expects you to send it back, e.g. response
+    ``{"data": [...], "next": "abc"}`` then request ``?cursor=abc``, or header
+    ``Link: <...>; rel="next"`` / ``X-Next-Cursor``. You do not compute the
+    next page; you echo whatever the server returned until it returns none.
+
+    Prefer this over offset/page whenever both exist: tokens stay correct when
+    the list mutates between calls. Use **offset** or **page_number** only when
+    the API has no continuation token and documents numeric skip or page index
+    instead.
+
+    Note: mid-run resume stores the token in ``checkpoint["pagination"]``. If
+    the API's tokens expire across process restarts, drain in one run or pair
+    with incremental windowing — this strategy does not invent a durable
+    watermark.
+
+Intent
+    Server-driven continuation. Stop when the next cursor is absent; raise if
+    the cursor does not change (no progress).
+
+Boundaries
+    Owns cursor inject/extract, optional page-size query param, stop/progress
+    checks, and mid-run ``checkpoint["pagination"]`` (``cursor``, ``page_size``,
+    ``page_index``). Does not own HTTP, watermarks, or clearing pagination on
+    success — :class:`Paginate` does.
+
+Example::
+
+    PaginationSettings(
+        strategy=PaginationStrategy.CURSOR,
+        items_path="data",
+        cursor=CursorPaginationSettings(
+            cursor_path="meta.next",
+            cursor_param="cursor",
+            page_size_param="limit",
+            page_size=100,
+        ),
+    )
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..enums import ExtractSource, InjectLocation, PaginationStrategy
-from ..extract import extract_header, extract_path
-from ..inject import PageState, RequestSnapshot, inject_value
+from ....utils.http.request import InjectLocation, get_header
+from ....utils.json_utils import get_path
+from ..enums import ExtractSource, PaginationStrategy
 from ..registry import register
+from ..settings import CursorPaginationSettings
+from .base import PageState, PaginationStrategyHandler
 
 if TYPE_CHECKING:
-    from ..settings import CursorPaginationSettings
+    from ....utils.http.request import RequestSnapshot
 
 
 def _read_next_cursor(
@@ -24,15 +66,15 @@ def _read_next_cursor(
     cfg: CursorPaginationSettings,
 ) -> str | None:
     if cfg.cursor_source is ExtractSource.HEADER:
-        return extract_header(headers, cfg.cursor_path)
-    value = extract_path(body, cfg.cursor_path)
+        return get_header(headers, cfg.cursor_path)
+    value = get_path(body, cfg.cursor_path)
     if value is None or value == "":
         return None
     return value if isinstance(value, str) else str(value)
 
 
 @register(PaginationStrategy.CURSOR)
-class CursorPaginationStrategy:
+class CursorPaginationStrategy(PaginationStrategyHandler[CursorPaginationSettings]):
     """Opaque cursor pagination: echo the server token until it is absent."""
 
     def initial_state(
@@ -59,20 +101,10 @@ class CursorPaginationStrategy:
         # mid-run resume keeps the same page size.
         page_size = state.values.get("page_size", cfg.page_size)
         if cfg.page_size_param is not None and page_size is not None:
-            out = inject_value(
-                out,
-                name=cfg.page_size_param,
-                value=page_size,
-                location=InjectLocation.QUERY,
-            )
+            out = out.inject(cfg.page_size_param, page_size, InjectLocation.QUERY)
         cursor = state.values["cursor"]
         if cursor is not None:
-            out = inject_value(
-                out,
-                name=cfg.cursor_param,
-                value=cursor,
-                location=cfg.cursor_location,
-            )
+            out = out.inject(cfg.cursor_param, cursor, cfg.cursor_location)
         return out
 
     def advance(

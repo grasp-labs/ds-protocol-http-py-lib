@@ -2,7 +2,7 @@
 **File:** ``test_watermark.py``
 **Region:** ``tests/dataset/incremental/test_watermark``
 
-Unit tests for incremental watermark inject and commit helpers.
+Unit tests for watermark incremental rules prepare/commit.
 """
 
 from __future__ import annotations
@@ -10,10 +10,10 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from ds_protocol_http_py_lib.dataset.incremental import IncrementalSettings
+from ds_protocol_http_py_lib.dataset.incremental import IncrementalSettings, WatermarkRules
 from ds_protocol_http_py_lib.dataset.incremental.watermark import commit, inject
-from ds_protocol_http_py_lib.dataset.pagination.inject import RequestSnapshot
 from ds_protocol_http_py_lib.enums import HttpMethod
+from ds_protocol_http_py_lib.utils.http.request import RequestSnapshot
 
 
 def _request() -> RequestSnapshot:
@@ -34,19 +34,24 @@ def test_inject_returns_unchanged_when_watermark_absent() -> None:
     settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")
     request = _request()
     assert inject(request, {}, settings) is request
+    assert WatermarkRules().prepare(request, {}, settings) is request
 
 
 def test_commit_skips_empty_output_and_missing_path() -> None:
     """Empty frames and rows without the watermark path do not advance state."""
     settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")
+    rules = WatermarkRules()
+
+    # Compatibility wrapper still clears pagination for direct callers.
     checkpoint: dict = {"pagination": {"offset": 2}}
     commit(checkpoint, pd.DataFrame(), settings)
     assert "pagination" not in checkpoint
     assert "incremental" not in checkpoint
 
+    # Ruleset commit does not clear pagination (Paginate owns that).
     checkpoint = {"pagination": {"offset": 1}}
-    commit(checkpoint, pd.DataFrame([{"id": 1}]), settings)
-    assert "pagination" not in checkpoint
+    rules.commit(checkpoint, pd.DataFrame([{"id": 1}]), settings)
+    assert "pagination" in checkpoint
     assert "incremental" not in checkpoint
 
 

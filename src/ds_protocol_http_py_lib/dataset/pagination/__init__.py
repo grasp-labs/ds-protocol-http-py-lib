@@ -2,12 +2,11 @@
 **File:** ``__init__.py``
 **Region:** ``ds_protocol_http_py_lib/dataset/pagination``
 
-HTTP dataset pagination: settings, enums, and strategy registry.
+HTTP dataset pagination: settings, enums, strategy registry, and Paginate composer.
 """
 
-# Opt-in registration of built-in strategies.
-from . import strategies as _strategies  # noqa: F401
-from .enums import ExtractSource, InjectLocation, PaginationStrategy
+from .enums import ExtractSource, PaginationStrategy
+from .paginate import Paginate
 from .registry import get_strategy, register
 from .settings import (
     CursorPaginationSettings,
@@ -15,15 +14,25 @@ from .settings import (
     PageNumberPaginationSettings,
     PaginationSettings,
 )
+from .strategies import (
+    CursorPaginationStrategy,
+    OffsetPaginationStrategy,
+    PageNumberPaginationStrategy,
+    PaginationStrategyHandler,
+)
 
 __all__ = [
     "CursorPaginationSettings",
+    "CursorPaginationStrategy",
     "ExtractSource",
-    "InjectLocation",
     "OffsetPaginationSettings",
+    "OffsetPaginationStrategy",
     "PageNumberPaginationSettings",
+    "PageNumberPaginationStrategy",
+    "Paginate",
     "PaginationSettings",
     "PaginationStrategy",
+    "PaginationStrategyHandler",
     "get_strategy",
     "register",
 ]

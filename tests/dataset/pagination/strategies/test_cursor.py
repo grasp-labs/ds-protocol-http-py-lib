@@ -12,13 +12,12 @@ import pytest
 from ds_protocol_http_py_lib.dataset.pagination import (
     CursorPaginationSettings,
     ExtractSource,
-    InjectLocation,
     PaginationSettings,
     PaginationStrategy,
     get_strategy,
 )
-from ds_protocol_http_py_lib.dataset.pagination.inject import RequestSnapshot
 from ds_protocol_http_py_lib.enums import HttpMethod
+from ds_protocol_http_py_lib.utils.http.request import InjectLocation, RequestSnapshot
 
 
 def _base_request() -> RequestSnapshot:

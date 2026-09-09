@@ -40,13 +40,13 @@ from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.dataset.incremental import IncrementalSettings
 from ds_protocol_http_py_lib.dataset.pagination import (
-    InjectLocation,
     OffsetPaginationSettings,
     PaginationSettings,
     PaginationStrategy,
 )
 from ds_protocol_http_py_lib.dataset.http import HttpReadSettings
 from ds_protocol_http_py_lib.enums import AuthType, HttpMethod
+from ds_protocol_http_py_lib.utils.http.request import InjectLocation
 from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
 from ds_protocol_http_py_lib.linked_service.http import (
     HttpLinkedService,

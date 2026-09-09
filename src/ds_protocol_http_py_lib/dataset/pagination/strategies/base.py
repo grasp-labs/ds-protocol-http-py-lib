@@ -1,39 +1,63 @@
 """
 **File:** ``base.py``
-**Region:** ``ds_protocol_http_py_lib/dataset/pagination/base``
+**Region:** ``ds_protocol_http_py_lib/dataset/pagination/strategies/base``
 
-Pagination strategy protocol and shared helpers.
+Base ABC for registered pagination strategies (page-variation hooks only).
+
+Concrete strategies (offset, page-number, cursor, …) inherit this. The HTTP
+drain loop lives on :class:`~dataset.pagination.paginate.Paginate`, which
+*uses* a strategy — strategies do not own ``run``.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+import abc
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 if TYPE_CHECKING:
-    from .inject import PageState, RequestSnapshot
-    from .settings import StrategyConfig
+    from ....utils.http.request import RequestSnapshot
+
+ConfigT = TypeVar("ConfigT")
 
 
-class PaginationStrategyHandler(Protocol):
-    """Runtime contract implemented by registered pagination strategies."""
+@dataclass
+class PageState:
+    """Strategy-owned traversal state for one paginated read."""
 
+    values: dict[str, Any] = field(default_factory=dict)
+    """Opaque strategy values (offset, page, cursor, …)."""
+
+    page_index: int = 0
+    """Zero-based count of pages fetched so far."""
+
+
+class PaginationStrategyHandler(abc.ABC, Generic[ConfigT]):
+    """
+    Page-variation contract parameterized by the strategy settings nest.
+
+    Each concrete strategy binds ``ConfigT`` to its nest type (e.g.
+    ``CursorPaginationSettings``) so hook signatures stay precise.
+    """
+
+    @abc.abstractmethod
     def initial_state(
         self,
-        cfg: StrategyConfig,
+        cfg: ConfigT,
         checkpoint_slice: dict[str, Any] | None,
     ) -> PageState:
         """Build the starting page state, optionally restoring from checkpoint."""
-        ...
 
+    @abc.abstractmethod
     def inject(
         self,
         request: RequestSnapshot,
         state: PageState,
-        cfg: StrategyConfig,
+        cfg: ConfigT,
     ) -> RequestSnapshot:
         """Return a request snapshot with pagination values applied."""
-        ...
 
+    @abc.abstractmethod
     def advance(
         self,
         *,
@@ -41,11 +65,11 @@ class PaginationStrategyHandler(Protocol):
         headers: Any,
         items: list[Any],
         state: PageState,
-        cfg: StrategyConfig,
+        cfg: ConfigT,
     ) -> PageState:
         """Advance state after a successful page response."""
-        ...
 
+    @abc.abstractmethod
     def should_stop(
         self,
         *,
@@ -53,18 +77,17 @@ class PaginationStrategyHandler(Protocol):
         headers: Any,
         items: list[Any],
         state: PageState,
-        cfg: StrategyConfig,
+        cfg: ConfigT,
     ) -> bool:
         """Return True when traversal should terminate after this page."""
-        ...
 
+    @abc.abstractmethod
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:
         """Serialize traversal state into the checkpoint ``pagination`` slice."""
-        ...
 
+    @abc.abstractmethod
     def from_checkpoint(self, data: dict[str, Any]) -> PageState:
         """Restore traversal state from a checkpoint ``pagination`` slice."""
-        ...
 
 
 def is_short_or_empty_page(items: list[Any], page_size: int) -> bool:

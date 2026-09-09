@@ -1,14 +1,18 @@
 """
 **File:** ``__init__.py``
 **Region:** ``ds_protocol_http_py_lib/dataset/pagination/strategies``
-
-Import strategy modules so they self-register with the pagination registry.
 """
 
-from . import cursor, offset, page_number
+from .base import PageState, PaginationStrategyHandler, is_short_or_empty_page
+from .cursor import CursorPaginationStrategy
+from .offset import OffsetPaginationStrategy
+from .page_number import PageNumberPaginationStrategy
 
 __all__ = [
-    "cursor",
-    "offset",
-    "page_number",
+    "CursorPaginationStrategy",
+    "OffsetPaginationStrategy",
+    "PageNumberPaginationStrategy",
+    "PageState",
+    "PaginationStrategyHandler",
+    "is_short_or_empty_page",
 ]

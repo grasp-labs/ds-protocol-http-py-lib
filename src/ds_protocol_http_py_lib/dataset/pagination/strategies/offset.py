@@ -2,25 +2,55 @@
 **File:** ``offset.py``
 **Region:** ``ds_protocol_http_py_lib/dataset/pagination/strategies/offset``
 
-Offset / limit pagination strategy.
+Offset / limit page strategy.
+
+When to use (arbitrary API)
+    Pick this if the API asks for a **numeric skip** into the list, e.g.
+    ``?offset=0&limit=100``, ``?skip=200&take=50``, ``from=100&size=100``.
+    You (the client) compute the next window: ``offset += limit``.
+
+    Prefer **cursor** instead when the same API also offers a next-token —
+    offsets break under inserts/deletes between pages (skipped / duplicated
+    rows). Prefer **page_number** if the API speaks in page indexes, not row
+    offsets (``?page=2&per_page=50``).
+
+Intent
+    Client-derived windows over a list. Stop on a short/empty page, or when
+    ``offset + limit >= total`` if ``total_path`` is set.
+
+Boundaries
+    Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
+    (``offset``, ``limit``, ``page_index``). Does not own HTTP, watermarks, or
+    clearing pagination on success — :class:`Paginate` does.
+
+Example::
+
+    PaginationSettings(
+        strategy=PaginationStrategy.OFFSET,
+        items_path="data",
+        offset=OffsetPaginationSettings(
+            page_size=100,
+            total_path="meta.total",  # optional
+        ),
+    )
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..base import is_short_or_empty_page
+from ....utils.json_utils import get_path
 from ..enums import PaginationStrategy
-from ..extract import extract_path
-from ..inject import PageState, RequestSnapshot, inject_value
 from ..registry import register
+from ..settings import OffsetPaginationSettings
+from .base import PageState, PaginationStrategyHandler, is_short_or_empty_page
 
 if TYPE_CHECKING:
-    from ..settings import OffsetPaginationSettings
+    from ....utils.http.request import RequestSnapshot
 
 
 @register(PaginationStrategy.OFFSET)
-class OffsetPaginationStrategy:
+class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSettings]):
     """Client-derived offset pagination: ``offset(n+1) = offset(n) + limit``."""
 
     def initial_state(
@@ -41,17 +71,15 @@ class OffsetPaginationStrategy:
         state: PageState,
         cfg: OffsetPaginationSettings,
     ) -> RequestSnapshot:
-        out = inject_value(
-            request,
-            name=cfg.offset_param,
-            value=state.values["offset"],
-            location=cfg.inject_location,
+        out = request.inject(
+            cfg.offset_param,
+            state.values["offset"],
+            cfg.inject_location,
         )
-        return inject_value(
-            out,
-            name=cfg.limit_param,
-            value=state.values["limit"],
-            location=cfg.inject_location,
+        return out.inject(
+            cfg.limit_param,
+            state.values["limit"],
+            cfg.inject_location,
         )
 
     def advance(
@@ -86,7 +114,7 @@ class OffsetPaginationStrategy:
             return True
         if cfg.total_path is None:
             return False
-        total = extract_path(body, cfg.total_path)
+        total = get_path(body, cfg.total_path)
         return total is not None and state.values["offset"] + state.values["limit"] >= int(total)
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:

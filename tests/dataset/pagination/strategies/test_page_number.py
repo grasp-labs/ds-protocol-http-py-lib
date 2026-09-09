@@ -13,8 +13,8 @@ from ds_protocol_http_py_lib.dataset.pagination import (
     PaginationStrategy,
     get_strategy,
 )
-from ds_protocol_http_py_lib.dataset.pagination.inject import RequestSnapshot
 from ds_protocol_http_py_lib.enums import HttpMethod
+from ds_protocol_http_py_lib.utils.http.request import RequestSnapshot
 
 
 def _base_request() -> RequestSnapshot:

@@ -7,14 +7,15 @@ HTTP Dataset
 This module implements a dataset for HTTP APIs.
 """
 
+from ..utils.http.request import InjectLocation
 from .http import HttpDataset, HttpDatasetSettings, HttpReadSettings
-from .incremental import IncrementalSettings
+from .incremental import IncrementalSettings, IncrementalStrategy
 from .pagination import (
     CursorPaginationSettings,
     ExtractSource,
-    InjectLocation,
     OffsetPaginationSettings,
     PageNumberPaginationSettings,
+    Paginate,
     PaginationSettings,
     PaginationStrategy,
 )
@@ -26,9 +27,11 @@ __all__ = [
     "HttpDatasetSettings",
     "HttpReadSettings",
     "IncrementalSettings",
+    "IncrementalStrategy",
     "InjectLocation",
     "OffsetPaginationSettings",
     "PageNumberPaginationSettings",
+    "Paginate",
     "PaginationSettings",
     "PaginationStrategy",
 ]
