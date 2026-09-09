@@ -1,12 +1,13 @@
 """
-**File:** ``01_read_dataset.py``
-**Region:** ``examples/01_read_dataset``
+**File:** ``05_read_cursor_pagination.py``
+**Region:** ``examples/05_read_cursor_pagination``
 
-Example 01: Read a dataset over HTTP (GET) using ds-protocol-http-py-lib.
+Example 05: Opaque cursor / token pagination (traversing scope).
 
-Demonstrates:
-- Basic GET request with a static URL.
-- GET request with path parameters interpolated into the URL template.
+The cursor is echoed untouched. Termination is an absent / null / empty next
+token. Cursor tokens are often single-use or time-limited: they belong to
+intra-read traversal (and optional mid-run resume), not to inter-run
+incremental state. On success the pagination slice is cleared.
 """
 
 from __future__ import annotations
@@ -21,6 +22,13 @@ from ds_common_logger_py_lib import Logger
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
+from ds_protocol_http_py_lib.dataset.pagination import (
+    CursorPaginationSettings,
+    ExtractSource,
+    PaginationSettings,
+    PaginationStrategy,
+)
+from ds_protocol_http_py_lib.dataset.http import HttpReadSettings
 from ds_protocol_http_py_lib.enums import AuthType, HttpMethod
 from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
 from ds_protocol_http_py_lib.linked_service.http import (
@@ -53,65 +61,45 @@ def _make_linked_service() -> HttpLinkedService:
 
 
 def main() -> pd.DataFrame:
-    """Read from a static URL."""
+    """Read all pages with cursor pagination."""
     linked_service = _make_linked_service()
 
     dataset = HttpDataset(
         id=uuid.uuid4(),
-        name="example::dataset",
+        name="example::cursor-pagination",
         version="1.0.0",
         linked_service=linked_service,
         settings=HttpDatasetSettings(
             method=HttpMethod.GET,
-            url="http://example.com/data",
+            url="http://example.com/v1/events",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.CURSOR,
+                    items_path="items",
+                    cursor=CursorPaginationSettings(
+                        cursor_path="response_metadata.next_cursor",
+                        cursor_source=ExtractSource.BODY,
+                        cursor_param="cursor",
+                        page_size_param="limit",
+                        page_size=200,
+                    ),
+                ),
+            ),
         ),
     )
 
     try:
         dataset.linked_service.connect()
         dataset.read()
+        logger.info("checkpoint after success: %s", dataset.checkpoint)
     except ResourceException as exc:
-        logger.error(f"Error reading dataset: {exc.__dict__}")
+        # Mid-run failure may leave {"pagination": {"cursor": "<next>", ...}}
+        logger.error("Error reading dataset: %s (checkpoint=%s)", exc, dataset.checkpoint)
         return pd.DataFrame()
 
     return dataset.output
 
 
-def main_with_path_params() -> pd.DataFrame:
-    """Read from a URL template with path parameters.
-
-    The ``{document_guid}`` placeholder in the URL is replaced with the value
-    supplied in ``path_params`` before the request is sent.
-    """
-    linked_service = _make_linked_service()
-
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="example::dataset-with-path-params",
-        version="1.0.0",
-        linked_service=linked_service,
-        settings=HttpDatasetSettings(
-            method=HttpMethod.GET,
-            url="http://example.com/documents/{document_guid}/original",
-            path_params={"document_guid": "abc123"},
-        ),
-    )
-    # Resolved URL → http://example.com/documents/abc123/original
-
-    try:
-        dataset.linked_service.connect()
-        dataset.read()
-        return dataset.output
-    except ResourceException as exc:
-        logger.error(f"Error reading dataset: {exc.__dict__}")
-        return pd.DataFrame()
-
-
 if __name__ == "__main__":
-    logger.info("--- static URL ---")
-    df = main()
-    logger.info(df)
-
-    logger.info("--- path params ---")
-    df2 = main_with_path_params()
-    logger.info(df2)
+    logger.info("--- cursor pagination ---")
+    logger.info(main())

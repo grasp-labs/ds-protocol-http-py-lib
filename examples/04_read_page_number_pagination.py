@@ -1,12 +1,12 @@
 """
-**File:** ``01_read_dataset.py``
-**Region:** ``examples/01_read_dataset``
+**File:** ``04_read_page_number_pagination.py``
+**Region:** ``examples/04_read_page_number_pagination``
 
-Example 01: Read a dataset over HTTP (GET) using ds-protocol-http-py-lib.
+Example 04: Page-number / page-size pagination (traversing scope).
 
-Demonstrates:
-- Basic GET request with a static URL.
-- GET request with path parameters interpolated into the URL template.
+Same checkpoint lifecycle as offset pagination: persist next page on mid-run
+failure; clear pagination after a successful full read. ``start_page`` must
+match the API (0- or 1-based).
 """
 
 from __future__ import annotations
@@ -21,6 +21,12 @@ from ds_common_logger_py_lib import Logger
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
+from ds_protocol_http_py_lib.dataset.pagination import (
+    PageNumberPaginationSettings,
+    PaginationSettings,
+    PaginationStrategy,
+)
+from ds_protocol_http_py_lib.dataset.http import HttpReadSettings
 from ds_protocol_http_py_lib.enums import AuthType, HttpMethod
 from ds_protocol_http_py_lib.linked_service import OAuth2AuthSettings
 from ds_protocol_http_py_lib.linked_service.http import (
@@ -53,65 +59,44 @@ def _make_linked_service() -> HttpLinkedService:
 
 
 def main() -> pd.DataFrame:
-    """Read from a static URL."""
+    """Read all pages with page-number pagination."""
     linked_service = _make_linked_service()
 
     dataset = HttpDataset(
         id=uuid.uuid4(),
-        name="example::dataset",
+        name="example::page-number-pagination",
         version="1.0.0",
         linked_service=linked_service,
         settings=HttpDatasetSettings(
             method=HttpMethod.GET,
-            url="http://example.com/data",
+            url="http://example.com/v1/customers",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.PAGE_NUMBER,
+                    items_path="results",
+                    page_number=PageNumberPaginationSettings(
+                        page_param="page",
+                        page_size_param="per_page",
+                        page_size=100,
+                        start_page=1,
+                        total_pages_path="total_pages",
+                    ),
+                ),
+            ),
         ),
     )
 
     try:
         dataset.linked_service.connect()
         dataset.read()
+        logger.info("checkpoint after success: %s", dataset.checkpoint)
     except ResourceException as exc:
-        logger.error(f"Error reading dataset: {exc.__dict__}")
+        logger.error("Error reading dataset: %s (checkpoint=%s)", exc, dataset.checkpoint)
         return pd.DataFrame()
 
     return dataset.output
 
 
-def main_with_path_params() -> pd.DataFrame:
-    """Read from a URL template with path parameters.
-
-    The ``{document_guid}`` placeholder in the URL is replaced with the value
-    supplied in ``path_params`` before the request is sent.
-    """
-    linked_service = _make_linked_service()
-
-    dataset = HttpDataset(
-        id=uuid.uuid4(),
-        name="example::dataset-with-path-params",
-        version="1.0.0",
-        linked_service=linked_service,
-        settings=HttpDatasetSettings(
-            method=HttpMethod.GET,
-            url="http://example.com/documents/{document_guid}/original",
-            path_params={"document_guid": "abc123"},
-        ),
-    )
-    # Resolved URL → http://example.com/documents/abc123/original
-
-    try:
-        dataset.linked_service.connect()
-        dataset.read()
-        return dataset.output
-    except ResourceException as exc:
-        logger.error(f"Error reading dataset: {exc.__dict__}")
-        return pd.DataFrame()
-
-
 if __name__ == "__main__":
-    logger.info("--- static URL ---")
-    df = main()
-    logger.info(df)
-
-    logger.info("--- path params ---")
-    df2 = main_with_path_params()
-    logger.info(df2)
+    logger.info("--- page_number pagination ---")
+    logger.info(main())

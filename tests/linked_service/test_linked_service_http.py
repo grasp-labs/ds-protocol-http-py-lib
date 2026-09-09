@@ -20,6 +20,7 @@ from typing import Any, cast
 import pytest
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
+    ConnectionError,
     LinkedServiceException,
 )
 
@@ -703,3 +704,11 @@ def test_close_handles_missing_http_gracefully() -> None:
     service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
     service._http = None
     service.close()  # Should not raise
+
+
+def test_connection_raises_when_session_not_initialized() -> None:
+    """Accessing connection before connect raises ConnectionError."""
+    props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH)
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    with pytest.raises(ConnectionError, match="Session is not initialized"):
+        _ = service.connection

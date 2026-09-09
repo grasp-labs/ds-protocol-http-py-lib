@@ -38,6 +38,7 @@ from typing import Any, Generic, NoReturn, TypeVar
 
 import pandas as pd
 from ds_common_logger_py_lib import Logger
+from ds_common_serde_py_lib import Serializable
 from ds_resource_plugin_py_lib.common.resource.dataset import (
     DatasetSettings,
     DatasetStorageFormatType,
@@ -47,7 +48,10 @@ from ds_resource_plugin_py_lib.common.resource.dataset.errors import (
     CreateError,
     ReadError,
 )
-from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
+from ds_resource_plugin_py_lib.common.resource.errors import (
+    NotSupportedError,
+    ResourceException,
+)
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthenticationError,
     AuthorizationError,
@@ -59,15 +63,32 @@ from ds_resource_plugin_py_lib.common.serde.serialize import PandasSerializer
 from ..enums import HttpMethod, ResourceType
 from ..linked_service.http import HttpLinkedService
 from ..models import Files
+from .incremental.settings import IncrementalSettings
+from .pagination.paginate import Paginate
+from .pagination.settings import PaginationSettings
 
 logger = Logger.get_logger(__name__, package=True)
 
 
 @dataclass(kw_only=True)
+class HttpReadSettings(Serializable):
+    """
+    Operation-scoped settings for ``HttpDataset.read()``.
+
+    - ``pagination`` — traversing scope within one read (absent = single request).
+    - ``incremental`` — watermark ruleset consulted by Paginate (not a separate gate).
+    """
+
+    pagination: PaginationSettings | None = None
+    """Pagination mechanism. ``None`` means a single request with no page loop."""
+
+    incremental: IncrementalSettings | None = None
+    """Incremental watermark rules for Paginate. Ignored when pagination is unset."""
+
+
+@dataclass(kw_only=True)
 class HttpDatasetSettings(DatasetSettings):
-    """
-    Settings for HTTP dataset.
-    """
+    """Settings for an HTTP dataset request."""
 
     method: HttpMethod = HttpMethod.GET
     """The HTTP method to use."""
@@ -99,6 +120,9 @@ class HttpDatasetSettings(DatasetSettings):
         # → https://api.example.com/documents/abc123/original
     """
 
+    read: HttpReadSettings = field(default_factory=HttpReadSettings)
+    """Read-scoped settings: pagination (traversing) and incremental (shifting)."""
+
 
 HttpDatasetSettingsType = TypeVar(
     "HttpDatasetSettingsType",
@@ -120,19 +144,40 @@ class HttpDataset(
     ],
     Generic[HttpLinkedServiceType, HttpDatasetSettingsType],
 ):
+    """
+    Tabular dataset backed by an HTTP API.
+
+    ``read()`` behavior is gated by ``settings.read``:
+
+    - pagination configured → :class:`Paginate` (optional incremental rules)
+    - otherwise → original single-request read
+    """
+
     linked_service: HttpLinkedServiceType
+    """Linked service used to issue authenticated HTTP requests."""
+
     settings: HttpDatasetSettingsType
+    """Request and read-scoped configuration."""
 
     serializer: PandasSerializer | None = field(
         default_factory=lambda: PandasSerializer(format=DatasetStorageFormatType.JSON),
     )
+    """Serializer used when writing payloads (``create``)."""
+
     deserializer: PandasDeserializer | None = field(
         default_factory=lambda: PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
+    """Deserializer used to materialize ``output`` from response bodies."""
 
     @property
     def type(self) -> ResourceType:
+        """Resource type discriminator."""
         return ResourceType.DATASET
+
+    @property
+    def supports_checkpoint(self) -> bool:
+        """True when pagination (mid-run resume / optional watermark) is configured."""
+        return self.settings.read.pagination is not None
 
     def _resolve_url(self) -> str:
         """Resolve the URL by substituting any path parameters."""
@@ -161,16 +206,13 @@ class HttpDataset(
 
     def create(self) -> None:
         """
-        Create data at the specified endpoint.
-
-        Args:
-            kwargs: Additional keyword arguments to pass to the request.
+        Create data at the specified endpoint (single request).
 
         Raises:
-            AuthenticationError: If the authentication fails.
-            AuthorizationError: If the authorization fails.
+            AuthenticationError: If authentication fails.
+            AuthorizationError: If authorization fails.
             ConnectionError: If the connection fails.
-            CreateError: If the create error occurs.
+            CreateError: If the create call fails.
         """
         try:
             url = self._resolve_url()
@@ -184,8 +226,8 @@ class HttpDataset(
                 params=self.settings.params,
                 headers=self.settings.headers,
             )
-        except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
-            raise exc
+        except (AuthenticationError, AuthorizationError, ConnectionError):
+            raise
         except ResourceException as exc:
             exc.details.update({"type": self.type.value})
             raise CreateError(
@@ -203,15 +245,19 @@ class HttpDataset(
         """
         Read data from the specified endpoint.
 
-        Args:
-            kwargs: Additional keyword arguments to pass to the request.
+        When ``settings.read.pagination`` is set, runs
+        ``Paginate.from_dataset(self).run(self)``. Otherwise issues one request.
 
         Raises:
-            AuthenticationError: If the authentication fails.
-            AuthorizationError: If the authorization fails.
+            AuthenticationError: If authentication fails.
+            AuthorizationError: If authorization fails.
             ConnectionError: If the connection fails.
-            ReadError: If the read error occurs.
+            ReadError: If the read call or pagination fails.
         """
+        if self.settings.read.pagination is not None:
+            Paginate.from_dataset(self).run(self)
+            return
+
         try:
             url = self._resolve_url()
             logger.debug(f"Sending {self.settings.method} request to {url}")
@@ -224,8 +270,8 @@ class HttpDataset(
                 params=self.settings.params,
                 headers=self.settings.headers,
             )
-        except (AuthenticationError, AuthorizationError, ConnectionError) as exc:
-            raise exc
+        except (AuthenticationError, AuthorizationError, ConnectionError):
+            raise
         except ResourceException as exc:
             exc.details.update({"type": self.type.value})
             raise ReadError(
