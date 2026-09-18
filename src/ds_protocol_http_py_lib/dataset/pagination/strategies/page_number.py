@@ -93,10 +93,11 @@ class PageNumberPaginationStrategy(PaginationStrategyHandler[PageNumberPaginatio
         cfg: PageNumberPaginationSettings,
     ) -> PageState:
         del body, headers, items
+        page_size = state.values.get("page_size", cfg.page_size)
         return PageState(
             values={
                 "page": state.values["page"] + 1,
-                "page_size": cfg.page_size,
+                "page_size": page_size,
             },
             page_index=state.page_index + 1,
         )
@@ -111,7 +112,7 @@ class PageNumberPaginationStrategy(PaginationStrategyHandler[PageNumberPaginatio
         cfg: PageNumberPaginationSettings,
     ) -> bool:
         del headers
-        if is_short_or_empty_page(items, cfg.page_size):
+        if is_short_or_empty_page(items, state.values["page_size"]):
             return True
         if cfg.total_pages_path is None:
             return False

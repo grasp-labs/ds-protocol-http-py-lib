@@ -74,6 +74,47 @@ def test_offset_inject_advance_stop_and_checkpoint() -> None:
     )
 
 
+def test_offset_advance_preserves_checkpoint_limit() -> None:
+    """Resume must keep checkpoint limit; cfg.page_size must not replace it after advance."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.OFFSET,
+        offset=OffsetPaginationSettings(page_size=50, initial_offset=0),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.OFFSET)
+    state = strategy.initial_state(
+        cfg,
+        {"strategy": "offset", "offset": 20, "limit": 10, "page_index": 2},
+    )
+    items = [{"id": i} for i in range(10)]
+    assert not strategy.should_stop(
+        body={"data": items},
+        headers={},
+        items=items,
+        state=state,
+        cfg=cfg,
+    )
+    nxt = strategy.advance(
+        body={"data": items},
+        headers={},
+        items=items,
+        state=state,
+        cfg=cfg,
+    )
+    assert nxt.values == {"offset": 30, "limit": 10}
+    assert nxt.page_index == 3
+    injected = strategy.inject(_base_request(), nxt, cfg)
+    assert injected.params == {"q": "x", "offset": 30, "limit": 10}
+    short = [{"id": 1}] * 9
+    assert strategy.should_stop(
+        body={"data": short},
+        headers={},
+        items=short,
+        state=nxt,
+        cfg=cfg,
+    )
+
+
 def test_offset_stops_when_total_reached() -> None:
     """Offset terminates when offset + limit covers total."""
     settings = PaginationSettings(

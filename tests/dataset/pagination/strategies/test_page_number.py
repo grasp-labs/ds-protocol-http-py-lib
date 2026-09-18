@@ -91,6 +91,47 @@ def test_page_number_total_pages_respects_start_page() -> None:
     assert _walk(0) == [(0, False), (1, False), (2, True)]
 
 
+def test_page_number_advance_preserves_checkpoint_page_size() -> None:
+    """Resume must keep checkpoint page_size; cfg.page_size must not replace it after advance."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.PAGE_NUMBER,
+        page_number=PageNumberPaginationSettings(page_size=50, start_page=1),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.PAGE_NUMBER)
+    state = strategy.initial_state(
+        cfg,
+        {"strategy": "page_number", "page": 3, "page_size": 10, "page_index": 2},
+    )
+    items = [{"id": i} for i in range(10)]
+    assert not strategy.should_stop(
+        body={"data": items},
+        headers={},
+        items=items,
+        state=state,
+        cfg=cfg,
+    )
+    nxt = strategy.advance(
+        body={"data": items},
+        headers={},
+        items=items,
+        state=state,
+        cfg=cfg,
+    )
+    assert nxt.values == {"page": 4, "page_size": 10}
+    assert nxt.page_index == 3
+    injected = strategy.inject(_base_request(), nxt, cfg)
+    assert injected.params == {"q": "x", "page": 4, "per_page": 10}
+    short = [{"id": 1}] * 9
+    assert strategy.should_stop(
+        body={"data": short},
+        headers={},
+        items=short,
+        state=nxt,
+        cfg=cfg,
+    )
+
+
 def test_page_number_resumes_from_checkpoint() -> None:
     """initial_state restores page/size/index via from_checkpoint."""
     settings = PaginationSettings(

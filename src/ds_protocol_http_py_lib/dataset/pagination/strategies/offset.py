@@ -92,10 +92,11 @@ class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSetting
         cfg: OffsetPaginationSettings,
     ) -> PageState:
         del body, headers, items
+        limit = state.values.get("limit", cfg.page_size)
         return PageState(
             values={
-                "offset": state.values["offset"] + state.values["limit"],
-                "limit": cfg.page_size,
+                "offset": state.values["offset"] + limit,
+                "limit": limit,
             },
             page_index=state.page_index + 1,
         )
@@ -110,7 +111,7 @@ class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSetting
         cfg: OffsetPaginationSettings,
     ) -> bool:
         del headers
-        if is_short_or_empty_page(items, cfg.page_size):
+        if is_short_or_empty_page(items, state.values["limit"]):
             return True
         if cfg.total_path is None:
             return False

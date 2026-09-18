@@ -159,6 +159,51 @@ def test_offset_resume_from_checkpoint() -> None:
     assert "pagination" not in dataset.checkpoint
 
 
+def test_offset_resume_keeps_checkpoint_limit_when_config_differs() -> None:
+    """Checkpoint limit wins over a larger cfg.page_size so resume does not stop or skip."""
+    calls: list[tuple[int, int]] = []
+
+    def fake_request(**kwargs: Any) -> Any:
+        offset = int(kwargs["params"]["offset"])
+        limit = int(kwargs["params"]["limit"])
+        calls.append((offset, limit))
+        page = [{"id": i} for i in range(offset, min(offset + limit, 6))]
+        return json_response({"data": page, "meta": {"total": 6}})
+
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(fake_request),
+        settings=HttpDatasetSettings(
+            url="https://example.test/orders",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.OFFSET,
+                    items_path="data",
+                    offset=OffsetPaginationSettings(page_size=4, total_path="meta.total"),
+                ),
+            ),
+        ),
+        checkpoint={
+            "pagination": {
+                "strategy": "offset",
+                "offset": 2,
+                "limit": 2,
+                "page_index": 1,
+            },
+        },
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
+    )
+    dataset.read()
+    assert calls == [(2, 2), (4, 2)]
+    assert list(dataset.output["id"]) == [2, 3, 4, 5]
+    assert "pagination" not in dataset.checkpoint
+
+
 def test_page_number_pagination() -> None:
     """Page-number strategy walks pages until short page."""
 
@@ -195,6 +240,58 @@ def test_page_number_pagination() -> None:
     )
     dataset.read()
     assert list(dataset.output["id"]) == ["a", "b", "c"]
+
+
+def test_page_number_resume_keeps_checkpoint_page_size_when_config_differs() -> None:
+    """Checkpoint page_size must stay in effect; mixing it with cfg.page_size skips rows."""
+    calls: list[tuple[int, int]] = []
+    all_ids = list(range(6))
+
+    def fake_request(**kwargs: Any) -> Any:
+        page = int(kwargs["params"]["page"])
+        per_page = int(kwargs["params"]["per_page"])
+        calls.append((page, per_page))
+        start = (page - 1) * per_page
+        results = [{"id": i} for i in all_ids[start : start + per_page]]
+        return json_response({"results": results})
+
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(fake_request),
+        settings=HttpDatasetSettings(
+            url="https://example.test/customers",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.PAGE_NUMBER,
+                    items_path="results",
+                    page_number=PageNumberPaginationSettings(
+                        page_param="page",
+                        page_size_param="per_page",
+                        page_size=4,
+                        start_page=1,
+                    ),
+                ),
+            ),
+        ),
+        checkpoint={
+            "pagination": {
+                "strategy": "page_number",
+                "page": 2,
+                "page_size": 2,
+                "page_index": 1,
+            },
+        },
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "results"},
+        ),
+    )
+    dataset.read()
+    assert calls == [(2, 2), (3, 2), (4, 2)]
+    assert list(dataset.output["id"]) == [2, 3, 4, 5]
+    assert "pagination" not in dataset.checkpoint
 
 
 def test_page_number_zero_based_stops_on_total_pages() -> None:
