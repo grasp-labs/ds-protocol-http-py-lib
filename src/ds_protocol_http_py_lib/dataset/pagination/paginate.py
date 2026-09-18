@@ -15,7 +15,6 @@ Example:
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
@@ -163,17 +162,10 @@ class Paginate:
             )
             body = parse_json(response.content)
             items = get_list(body, pagination.items_path)
-            frames.append(
-                dataset.deserializer(
-                    self._page_deserializer_input(
-                        response_content=response.content,
-                        items=items,
-                        items_path=pagination.items_path,
-                    ),
-                )
-                if dataset.deserializer
-                else pd.DataFrame(items),
-            )
+            if dataset.deserializer is not None and response.content:
+                frames.append(dataset.deserializer(response.content))
+            else:
+                frames.append(pd.DataFrame(items))
 
             if strategy.should_stop(
                 body=body,
@@ -234,23 +226,6 @@ class Paginate:
             raise ValueError(
                 f"Checkpoint pagination strategy '{actual}' does not match configured strategy '{expected}'",
             )
-
-    @staticmethod
-    def _page_deserializer_input(
-        *,
-        response_content: bytes | str | None,
-        items: list[Any],
-        items_path: str,
-    ) -> Any:
-        """
-        Build the payload passed to ``dataset.deserializer`` for one page.
-
-        - ``items_path`` of ``$`` / ``""``: use raw ``response.content``.
-        - Otherwise: JSON-encode the extracted record list.
-        """
-        if items_path in ("$", ""):
-            return response_content
-        return json.dumps(items).encode("utf-8")
 
     @staticmethod
     def _concat_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:

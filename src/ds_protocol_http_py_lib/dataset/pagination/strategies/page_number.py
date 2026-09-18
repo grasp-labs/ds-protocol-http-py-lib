@@ -15,7 +15,8 @@ When to use (arbitrary API)
 
 Intent
     Client-derived page ordinals. Stop on a short/empty page, or when
-    ``page >= total_pages`` if ``total_pages_path`` is set.
+    ``page >= start_page + total_pages - 1`` if ``total_pages_path`` is set
+    (``total_pages`` is a count, so the last ordinal depends on ``start_page``).
 
 Boundaries
     Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
@@ -115,7 +116,7 @@ class PageNumberPaginationStrategy(PaginationStrategyHandler[PageNumberPaginatio
         if cfg.total_pages_path is None:
             return False
         total_pages = get_path(body, cfg.total_pages_path)
-        return total_pages is not None and state.values["page"] >= int(total_pages)
+        return total_pages is not None and state.values["page"] >= cfg.start_page + int(total_pages) - 1
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:
         return {

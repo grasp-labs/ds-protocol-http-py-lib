@@ -35,7 +35,9 @@ import uuid
 import pandas as pd
 from dotenv import load_dotenv
 from ds_common_logger_py_lib import Logger
+from ds_resource_plugin_py_lib.common.resource.dataset import DatasetStorageFormatType
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.serde.deserialize import PandasDeserializer
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.dataset.incremental import IncrementalSettings
@@ -92,6 +94,10 @@ def main() -> pd.DataFrame:
         name="example::incremental-with-pagination",
         version="1.0.0",
         linked_service=linked_service,
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             method=HttpMethod.GET,
             url="http://example.com/v1/orders",
@@ -122,17 +128,9 @@ def main() -> pd.DataFrame:
     try:
         dataset.linked_service.connect()
         dataset.read()
-        # Success example:
-        #   {"incremental": {"watermark": "<max updated_at from output>"}}
-        # Pagination key is gone -- traversal resets for the next run.
         logger.info("checkpoint after success: %s", dataset.checkpoint)
     except ResourceException as exc:
-        # Failure example:
-        #   incremental watermark UNCHANGED
-        #   pagination holds next offset for resume within the same window
-        logger.error(
-            "Error reading dataset: %s (checkpoint=%s)", exc, dataset.checkpoint
-        )
+        logger.error("Error reading dataset: %s (checkpoint=%s)", exc, dataset.checkpoint)
         return pd.DataFrame()
 
     return dataset.output

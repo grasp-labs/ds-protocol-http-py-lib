@@ -20,6 +20,7 @@ from typing import Any, cast
 import pandas as pd
 import pandas.testing as pdt
 import pytest
+from ds_resource_plugin_py_lib.common.resource.dataset import DatasetStorageFormatType
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import CreateError, ReadError
 from ds_resource_plugin_py_lib.common.resource.errors import NotSupportedError, ResourceException
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
@@ -27,12 +28,13 @@ from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     AuthorizationError,
     ConnectionError,
 )
+from ds_resource_plugin_py_lib.common.serde.deserialize import PandasDeserializer
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.enums import HttpMethod, ResourceType
 from ds_protocol_http_py_lib.models import Files
 from tests.dataset.helpers import json_response, linked_service
-from tests.mocks import DeserializerStub, HttpClient, HttpResponseBytes, LinkedService
+from tests.mocks import HttpClient, HttpResponseBytes, LinkedService
 
 
 def test_dataset_type_is_dataset() -> None:
@@ -89,8 +91,7 @@ def test_create_without_serializer_still_makes_request_and_deserializes() -> Non
     It can run create when serializer is None and still deserialize response content.
     """
 
-    deserializer = DeserializerStub()
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
+    http = HttpClient(response=HttpResponseBytes(content=b'[{"ok": 1}]'))
     linked_service = LinkedService(http=http)
     props = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.POST, data=b"raw")
     dataset = HttpDataset(
@@ -100,13 +101,13 @@ def test_create_without_serializer_still_makes_request_and_deserializes() -> Non
         linked_service=cast("Any", linked_service),
         settings=props,
         serializer=None,
-        deserializer=cast("Any", deserializer),
+        deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
     linked_service.connect()
     dataset.create()
     assert http.last_request is not None
     assert http.last_request["data"] == b"raw"
-    assert isinstance(dataset.output, pd.DataFrame)
+    assert list(dataset.output["ok"]) == [1]
 
 
 def test_create_sets_empty_dataframe_when_response_has_no_content() -> None:
@@ -132,21 +133,20 @@ def test_files_descriptor_is_mapped_to_requests_files() -> None:
     """
     content_bytes = b"id,name\n1,alice\n"
 
-    http = HttpClient(response=HttpResponseBytes(content=b'{"ok": 1}'))
+    http = HttpClient(response=HttpResponseBytes(content=b'[{"ok": 1}]'))
     linked_service = LinkedService(http=http)
     props = HttpDatasetSettings(
         url="https://example.test/data",
         files=[Files(filename="test.pdf", content=content_bytes, content_type="application/pdf")],
     )
 
-    deserializer = DeserializerStub()
     dataset = HttpDataset(
         id=uuid.uuid4(),
         name="test-dataset",
         version="1.0.0",
         linked_service=cast("Any", linked_service),
         settings=props,
-        deserializer=cast("Any", deserializer),
+        deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
     linked_service.connect()
     dataset.read()
@@ -667,14 +667,18 @@ def test_http_dataset_read_uses_deserializer_not_overwritten() -> None:
     linked_service = cast("Any", SimpleNamespace(connection=connection, close=lambda: None))
 
     settings = HttpDatasetSettings(url="https://example.test/data", method=HttpMethod.GET)
-    dataset = HttpDataset(linked_service=linked_service, settings=settings, id=uuid.uuid4(), name="test", version="1.0.0")
-
-    expected = pd.DataFrame({"x": [1]})
-    dataset.deserializer = cast("Any", lambda c: expected)
+    dataset = HttpDataset(
+        linked_service=linked_service,
+        settings=settings,
+        id=uuid.uuid4(),
+        name="test",
+        version="1.0.0",
+        deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
+    )
 
     dataset.read()
 
-    pdt.assert_frame_equal(dataset.output, expected)
+    pdt.assert_frame_equal(dataset.output, pd.DataFrame({"x": [1]}))
 
 
 def test_supports_checkpoint_false_without_read_features() -> None:
@@ -695,7 +699,7 @@ def test_single_request_unchanged_without_pagination() -> None:
 
     def fake_request(**kwargs: Any) -> SimpleNamespace:
         calls["n"] += 1
-        return json_response({"ok": True})
+        return json_response([{"ok": True}])
 
     dataset = HttpDataset(
         id=uuid.uuid4(),
@@ -703,9 +707,7 @@ def test_single_request_unchanged_without_pagination() -> None:
         version="1.0.0",
         linked_service=linked_service(fake_request),
         settings=HttpDatasetSettings(url="https://example.test/data"),
-        deserializer=lambda content: pd.DataFrame(  # type: ignore[arg-type]
-            [{"raw": content.decode()}],
-        ),
+        deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
     )
     dataset.read()
     assert calls["n"] == 1

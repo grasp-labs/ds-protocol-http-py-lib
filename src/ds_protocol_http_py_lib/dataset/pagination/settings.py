@@ -121,7 +121,11 @@ class PaginationSettings(Serializable):
     """
 
     items_path: str = "data"
-    """Path to the record array in the response body. Use ``$`` for a root array."""
+    """
+    Path to the record array used for paging control (stop / advance).
+    Use ``$`` for a root array. Does not control how the page body is
+    materialized — that is ``dataset.deserializer(response.content)``.
+    """
 
     offset: OffsetPaginationSettings | None = None
     """Required when ``strategy`` is ``offset``."""

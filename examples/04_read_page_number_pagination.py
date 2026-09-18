@@ -18,7 +18,9 @@ import uuid
 import pandas as pd
 from dotenv import load_dotenv
 from ds_common_logger_py_lib import Logger
+from ds_resource_plugin_py_lib.common.resource.dataset import DatasetStorageFormatType
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
+from ds_resource_plugin_py_lib.common.serde.deserialize import PandasDeserializer
 
 from ds_protocol_http_py_lib.dataset.http import HttpDataset, HttpDatasetSettings
 from ds_protocol_http_py_lib.dataset.pagination import (
@@ -67,6 +69,10 @@ def main() -> pd.DataFrame:
         name="example::page-number-pagination",
         version="1.0.0",
         linked_service=linked_service,
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "results"},
+        ),
         settings=HttpDatasetSettings(
             method=HttpMethod.GET,
             url="http://example.com/v1/customers",
