@@ -10,11 +10,15 @@ proper Python package, so intra-package relative imports resolve correctly.
 
 from .config import HttpConfig, RetryConfig
 from .provider import Http
+from .request import InjectLocation, RequestSnapshot, get_header
 from .token_bucket import TokenBucket
 
 __all__ = [
     "Http",
     "HttpConfig",
+    "InjectLocation",
+    "RequestSnapshot",
     "RetryConfig",
     "TokenBucket",
+    "get_header",
 ]
