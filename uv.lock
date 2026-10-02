@@ -460,11 +460,11 @@ wheels = [
 
 [[package]]
 name = "ds-common-logger-py-lib"
-version = "0.1.0a5"
+version = "0.1.0a6"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1c/fe/eabb5237c73d44dc23174577e73d8456c64eb331daa51006f0ca4114b17d/ds_common_logger_py_lib-0.1.0a5.tar.gz", hash = "sha256:e34684900e6afd01c4fb10bf01d833926324f5cbb2385cfb77c5a455df2e0a82", size = 21977, upload-time = "2026-01-25T18:29:58.09Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/79/ca4d8837a0c2ff0052598fec40d6e178efb0e97e7edceb1dd58f1e2ed996/ds_common_logger_py_lib-0.1.0a6.tar.gz", hash = "sha256:47897a05f8ad6b0706d0a3ee32fc74b9ac5ae30460af658b8d34effabaa03f89", size = 22008, upload-time = "2026-03-17T09:36:44.059Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/cf/c0472c2988278a9870692a3995d57dbe13d0b10abb783345196de3129f31/ds_common_logger_py_lib-0.1.0a5-py3-none-any.whl", hash = "sha256:68ad595d9ba3cf55375072d9ce6a97319b7ca0a4551d464ab1bd488d9fbaece2", size = 14733, upload-time = "2026-01-25T18:29:57.118Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/37/f75f4c7fbd9a1d100b4c0f072af543934444a4d3aca0d4a9deed945c6c09/ds_common_logger_py_lib-0.1.0a6-py3-none-any.whl", hash = "sha256:72c16dd6877dc17d4595282ad65253cde7888d0b6884a0ff5a0f0e7b0f984b2b", size = 14735, upload-time = "2026-03-17T09:36:43.027Z" },
 ]
 
 [[package]]
@@ -481,7 +481,7 @@ wheels = [
 
 [[package]]
 name = "ds-protocol-http-py-lib"
-version = "0.1.0rc1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "ds-common-logger-py-lib" },
@@ -501,6 +501,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
+    { name = "python-dotenv" },
     { name = "requests-mock" },
     { name = "ruff" },
     { name = "sphinx" },
@@ -538,6 +539,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.1.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.0" },
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.3.0" },
+    { name = "python-dotenv", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.32.0,<3.0.0" },
     { name = "requests-mock", marker = "extra == 'dev'", specifier = ">=1.12.1" },
     { name = "requests-mock", marker = "extra == 'test'", specifier = ">=1.12.1" },
@@ -555,7 +557,7 @@ provides-extras = ["dev", "test", "docs"]
 
 [[package]]
 name = "ds-resource-plugin-py-lib"
-version = "0.1.0rc1"
+version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "awswrangler" },
@@ -565,9 +567,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b4/cb/6baf2b0d49f8764158a79b64eef23a7f081511bca66f5e02c8d9132d1890/ds_resource_plugin_py_lib-0.1.0rc1.tar.gz", hash = "sha256:ae27af3a31e4d8cc133fa25b8d0eb3bffaf768ec526f61100608098fb5cd87ba", size = 22463, upload-time = "2026-02-24T11:03:18.682Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/20/13/b83334f144158d20f1be99e5a052a5e633646a02234db23d44f750d8ee87/ds_resource_plugin_py_lib-0.1.0.tar.gz", hash = "sha256:2aef13c0ce5560c8c599639108a16ea92187effebbab8c2a2c61c424de2ce529", size = 25093, upload-time = "2026-07-02T08:35:07.359Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/04/dac0995c3e1ce1e58e7cb09c62e1a837877e9b1a33d9d3e5e3b2f7784de7/ds_resource_plugin_py_lib-0.1.0rc1-py3-none-any.whl", hash = "sha256:56e08d431393f5e4e225f6517c72af83b5776a8ac49c72d10f3721afdf2351cb", size = 31141, upload-time = "2026-02-24T11:03:17.7Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/97/70d98f2d7b7557d3b72b65d7fc66c4c74a79d466548b6259869722eb76d4/ds_resource_plugin_py_lib-0.1.0-py3-none-any.whl", hash = "sha256:b2e089136422bad3cac06d4ae60351ffbdfe813b4fad8e8429d715158c631745", size = 35746, upload-time = "2026-07-02T08:35:06.272Z" },
 ]
 
 [[package]]
@@ -1419,6 +1421,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432, upload-time = "2024-03-01T18:36:20.211Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/53/ed9d74092561d4b01a2ef1349d52cdbc135e526c245f366b089cfca6de49/python_dotenv-1.2.3.tar.gz", hash = "sha256:a20a594dabeaa385725aa239d5244871c143ecb356add8a20fcf23773a6c3a35", size = 58945, upload-time = "2026-08-16T16:54:54.067Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/17/c5c6b53ddc18f297992099b3d9ec16c855c0ccc83263a21fe4d1c625ec6c/python_dotenv-1.2.3-py3-none-any.whl", hash = "sha256:904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9", size = 22780, upload-time = "2026-08-16T16:54:52.473Z" },
 ]
 
 [[package]]
