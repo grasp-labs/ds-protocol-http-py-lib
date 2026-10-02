@@ -150,6 +150,15 @@ def test_cursor_resumes_from_checkpoint() -> None:
     injected = strategy.inject(_base_request(), restored, cfg)
     assert injected.params["limit"] == 25
     assert injected.params["cursor"] == "tok-resume"
+    nxt = strategy.advance(
+        body={"next": "tok-3"},
+        headers={},
+        items=[{"id": 1}],
+        state=restored,
+        cfg=cfg,
+    )
+    assert nxt.values["page_size"] == 25
+    assert strategy.inject(_base_request(), nxt, cfg).params["limit"] == 25
     assert (
         strategy.from_checkpoint(
             {"cursor": "tok-2", "page_size": 10, "page_index": 2},

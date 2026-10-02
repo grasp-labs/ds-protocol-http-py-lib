@@ -111,12 +111,13 @@ class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSetting
         cfg: OffsetPaginationSettings,
     ) -> bool:
         del headers
-        if is_short_or_empty_page(items, state.values["limit"]):
+        limit = state.values.get("limit", cfg.page_size)
+        if is_short_or_empty_page(items, limit):
             return True
         if cfg.total_path is None:
             return False
         total = get_path(body, cfg.total_path)
-        return total is not None and state.values["offset"] + state.values["limit"] >= int(total)
+        return total is not None and state.values["offset"] + limit >= int(total)
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:
         return {
