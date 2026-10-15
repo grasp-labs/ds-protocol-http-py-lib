@@ -109,6 +109,68 @@ def test_post_init_with_port_uses_host_and_port() -> None:
     assert service.base_uri == "api.example.test:8443"
 
 
+def test_init_http_uses_default_timeout_and_retry_when_omitted() -> None:
+    """
+    It keeps the 60 s timeout and 3 retries when the settings don't set them.
+    """
+
+    props = HttpLinkedServiceSettings(host="api.example.test", auth_type=AuthType.NO_AUTH)
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    assert service._http is not None
+    assert service._http._cfg.timeout_seconds == 60
+    assert service._http._cfg.retry.total == 3
+    assert service._http.session.get_adapter("https://api.example.test").max_retries.total == 3
+
+
+def test_init_http_uses_timeout_and_retry_from_settings() -> None:
+    """
+    It passes timeout_seconds and retry_total from the settings to the Http client.
+    """
+
+    props = HttpLinkedServiceSettings(
+        host="api.example.test",
+        auth_type=AuthType.NO_AUTH,
+        timeout_seconds=300,
+        retry_total=0,
+    )
+    service = HttpLinkedService(id=uuid.uuid4(), name="test-name", version="1.0.0", settings=props)
+    assert service._http is not None
+    assert service._http._cfg.timeout_seconds == 300
+    assert service._http._cfg.retry.total == 0
+    assert service._http.session.get_adapter("https://api.example.test").max_retries.total == 0
+
+
+@pytest.mark.parametrize("timeout", [0.5, 300.5, 300])
+def test_settings_deserialize_keeps_timeout_value(timeout: float) -> None:
+    """
+    It keeps fractional timeout_seconds when settings are deserialized.
+    """
+
+    props = HttpLinkedServiceSettings.deserialize({"host": "h", "auth_type": "NoAuth", "timeout_seconds": timeout})
+    assert props.timeout_seconds == timeout
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"timeout_seconds": 0},
+        {"timeout_seconds": -1},
+        {"timeout_seconds": None},
+        {"timeout_seconds": float("nan")},
+        {"timeout_seconds": float("inf")},
+        {"retry_total": -1},
+        {"retry_total": None},
+    ],
+)
+def test_settings_reject_invalid_timeout_and_retry(overrides: dict[str, Any]) -> None:
+    """
+    It rejects non-positive or missing timeouts and negative or missing retry counts.
+    """
+
+    with pytest.raises(ValueError):
+        HttpLinkedServiceSettings(host="h", auth_type=AuthType.NO_AUTH, **overrides)
+
+
 def test_connect_initializes_http_when_missing() -> None:
     """
     It (re)initializes the internal Http client if _http is None.

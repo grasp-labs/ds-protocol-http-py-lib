@@ -23,7 +23,7 @@ class RetryConfig:
     """
     Retry policy (urllib3 Retry via requests).
 
-    - total: max attempts (includes first request)
+    - total: max retries after the first attempt (total=3 means up to 4 attempts)
     - backoff_factor: sleep = factor * (2 ** (retry_num - 1))
     - status_forcelist: statuses that trigger retry
     - allowed_methods: methods eligible for retry

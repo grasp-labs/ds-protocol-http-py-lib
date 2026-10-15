@@ -25,6 +25,7 @@ Example:
 """
 
 import base64
+import math
 from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
@@ -183,6 +184,14 @@ class HttpLinkedServiceSettings(LinkedServiceSettings):
     headers: dict[str, str] | None = None
     """Additional headers to include with all requests."""
 
+    timeout_seconds: float = 60
+    """Default request timeout in seconds, applied to connect and to each wait for the next byte of the response.
+    Does not apply to auth token requests or calls that pass their own timeout."""
+
+    retry_total: int = 3
+    """Number of retries after the first attempt, on connection errors, timeouts and 429/5xx responses.
+    Each attempt gets the full timeout, so set this to 0 for slow, non-idempotent POSTs (e.g. LLM calls)."""
+
     # Auth-specific settings (provide one based on auth_type)
     api_key: ApiKeyAuthSettings | None = None
     """Settings for API Key authentication. Required when auth_type=AuthType.API_KEY."""
@@ -198,6 +207,16 @@ class HttpLinkedServiceSettings(LinkedServiceSettings):
 
     custom: CustomAuthSettings | None = None
     """Settings for custom token authentication. Required when auth_type=AuthType.CUSTOM."""
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.timeout_seconds, bool)
+            or not isinstance(self.timeout_seconds, int | float)
+            or not 0 < self.timeout_seconds < math.inf
+        ):
+            raise ValueError(f"timeout_seconds must be a positive number, got {self.timeout_seconds!r}")
+        if isinstance(self.retry_total, bool) or not isinstance(self.retry_total, int) or self.retry_total < 0:
+            raise ValueError(f"retry_total must be a non-negative integer, got {self.retry_total!r}")
 
 
 HttpLinkedServiceSettingsType = TypeVar(
@@ -277,7 +296,7 @@ class HttpLinkedService(
         Initialize the Http client instance with HttpConfig and TokenBucket.
 
         Creates an Http instance with:
-        - HttpConfig using headers from the linked service settings
+        - HttpConfig using headers, timeout_seconds and retry_total from the linked service settings
         - TokenBucket with rate limiting (10 requests per second, capacity of 20)
 
         Subclasses can override this method to customize the entire Http initialization,
@@ -287,7 +306,7 @@ class HttpLinkedService(
             Http: The initialized Http client instance.
         """
         retry_config = RetryConfig(
-            total=3,
+            total=self.settings.retry_total,
             backoff_factor=0.2,
             status_forcelist=(429, 500, 502, 503, 504),
             allowed_methods=("GET", "POST", "PUT", "DELETE", "PATCH"),
@@ -296,7 +315,7 @@ class HttpLinkedService(
         )
         config = HttpConfig(
             headers=dict(self.settings.headers or {}),
-            timeout_seconds=60,
+            timeout_seconds=self.settings.timeout_seconds,
             user_agent=f"{PACKAGE_NAME}/{__version__}",
             retry=retry_config,
         )
