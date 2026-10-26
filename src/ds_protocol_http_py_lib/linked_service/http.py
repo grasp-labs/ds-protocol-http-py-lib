@@ -26,7 +26,7 @@ Example:
 
 import base64
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from ds_resource_plugin_py_lib.common.resource.linked_service import (
     LinkedService,
@@ -137,7 +137,7 @@ class CustomAuthSettings:
     token_endpoint: str
     """The URL to fetch the token from."""
 
-    data: dict[str, str] | None = None
+    data: dict[str, Any] | None = None
     """Custom token request data sent as JSON or form-encoded based on Content-Type."""
 
 
