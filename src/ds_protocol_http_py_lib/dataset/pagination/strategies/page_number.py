@@ -14,9 +14,10 @@ When to use (arbitrary API)
     inserted/deleted between requests.
 
 Intent
-    Client-derived page ordinals. Stop on a short/empty page, or when
-    ``page >= start_page + total_pages - 1`` if ``total_pages_path`` is set
-    (``total_pages`` is a count, so the last ordinal depends on ``start_page``).
+    Client-derived page ordinals. When ``total_pages_path`` resolves, stop
+    when ``page >= start_page + total_pages - 1`` (``total_pages`` is a count,
+    so the last ordinal depends on ``start_page``). Otherwise stop on a short
+    or empty page.
 
 Boundaries
     Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
@@ -112,13 +113,12 @@ class PageNumberPaginationStrategy(PaginationStrategyHandler[PageNumberPaginatio
         cfg: PageNumberPaginationSettings,
     ) -> bool:
         del headers
-        page_size = state.values.get("page_size", cfg.page_size)
-        if is_short_or_empty_page(items, page_size):
-            return True
-        if cfg.total_pages_path is None:
-            return False
-        total_pages = get_path(body, cfg.total_pages_path)
-        return total_pages is not None and state.values["page"] >= cfg.start_page + int(total_pages) - 1
+        if cfg.total_pages_path is not None:
+            total_pages = get_path(body, cfg.total_pages_path)
+            if total_pages is not None:
+                return int(state.values["page"]) >= cfg.start_page + int(total_pages) - 1
+        page_size = int(state.values.get("page_size", cfg.page_size))
+        return is_short_or_empty_page(items, page_size)
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:
         return {

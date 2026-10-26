@@ -11,6 +11,7 @@ import uuid
 from types import SimpleNamespace
 from typing import Any
 
+import pandas as pd
 import pytest
 from ds_resource_plugin_py_lib.common.resource.dataset import DatasetStorageFormatType
 from ds_resource_plugin_py_lib.common.resource.dataset.errors import ReadError
@@ -51,6 +52,10 @@ def test_offset_pagination_concatenates_and_clears_checkpoint() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             method=HttpMethod.GET,
@@ -61,10 +66,6 @@ def test_offset_pagination_concatenates_and_clears_checkpoint() -> None:
                     offset=OffsetPaginationSettings(page_size=2, total_path="meta.total"),
                 ),
             ),
-        ),
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
         ),
     )
     assert dataset.supports_checkpoint is True
@@ -90,6 +91,10 @@ def test_offset_failure_persists_pagination_resume_state() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
@@ -102,10 +107,6 @@ def test_offset_failure_persists_pagination_resume_state() -> None:
             ),
         ),
         checkpoint={"incremental": {"watermark": 10}},
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
-        ),
     )
 
     with pytest.raises(ReadError, match="boom"):
@@ -130,6 +131,10 @@ def test_offset_resume_from_checkpoint() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
@@ -148,10 +153,6 @@ def test_offset_resume_from_checkpoint() -> None:
                 "page_index": 1,
             },
         },
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
-        ),
     )
     dataset.read()
     assert calls == [2]
@@ -175,6 +176,10 @@ def test_offset_resume_keeps_checkpoint_limit_when_config_differs() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
@@ -193,10 +198,6 @@ def test_offset_resume_keeps_checkpoint_limit_when_config_differs() -> None:
                 "page_index": 1,
             },
         },
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
-        ),
     )
     dataset.read()
     assert calls == [(2, 2), (4, 2)]
@@ -218,6 +219,10 @@ def test_page_number_pagination() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "results"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/customers",
             read=HttpReadSettings(
@@ -232,10 +237,6 @@ def test_page_number_pagination() -> None:
                     ),
                 ),
             ),
-        ),
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "results"},
         ),
     )
     dataset.read()
@@ -260,6 +261,10 @@ def test_page_number_resume_keeps_checkpoint_page_size_when_config_differs() -> 
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "results"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/customers",
             read=HttpReadSettings(
@@ -283,10 +288,6 @@ def test_page_number_resume_keeps_checkpoint_page_size_when_config_differs() -> 
                 "page_index": 1,
             },
         },
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "results"},
-        ),
     )
     dataset.read()
     assert calls == [(2, 2), (3, 2), (4, 2)]
@@ -312,6 +313,10 @@ def test_page_number_zero_based_stops_on_total_pages() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "results"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/customers",
             read=HttpReadSettings(
@@ -327,10 +332,6 @@ def test_page_number_zero_based_stops_on_total_pages() -> None:
                     ),
                 ),
             ),
-        ),
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "results"},
         ),
     )
     dataset.read()
@@ -363,6 +364,10 @@ def test_cursor_pagination() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "items"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/events",
             read=HttpReadSettings(
@@ -377,10 +382,6 @@ def test_cursor_pagination() -> None:
                     ),
                 ),
             ),
-        ),
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "items"},
         ),
     )
     dataset.read()
@@ -409,6 +410,10 @@ def test_incremental_with_pagination_resets_page_on_success() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             params={},
@@ -430,10 +435,6 @@ def test_incremental_with_pagination_resets_page_on_success() -> None:
                 "page_index": 0,
             },
         },
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
-        ),
     )
     dataset.read()
     assert "pagination" not in dataset.checkpoint
@@ -452,6 +453,10 @@ def test_max_pages_raises() -> None:
         name="ds",
         version="1.0.0",
         linked_service=linked_service(fake_request),
+        deserializer=PandasDeserializer(
+            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
+            kwargs={"record_path": "data"},
+        ),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
@@ -462,10 +467,6 @@ def test_max_pages_raises() -> None:
                     offset=OffsetPaginationSettings(page_size=2),
                 ),
             ),
-        ),
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
         ),
     )
     with pytest.raises(ReadError, match="max_pages"):
@@ -547,15 +548,21 @@ def test_paginate_rejects_non_dict_pagination_checkpoint() -> None:
         dataset.read()
 
 
-def test_paginate_deserializer_materializes_envelope_records() -> None:
-    """PandasDeserializer unwraps the list envelope from raw response content."""
-    envelope = {"data": [{"id": 1}, {"id": 2}], "page": {"total": 2}}
+def test_paginate_deserializer_receives_response_body() -> None:
+    """The deserializer receives the API body, not the items_path slice."""
+    seen: list[Any] = []
+    payload = {"data": [{"id": 1}, {"id": 2}], "page": {"total": 2}}
+    response = json_response(payload)
+
+    def deserialize(value: Any) -> pd.DataFrame:
+        seen.append(value)
+        return pd.DataFrame([{"id": 1}, {"id": 2}])
 
     dataset = HttpDataset(
         id=uuid.uuid4(),
         name="ds",
         version="1.0.0",
-        linked_service=linked_service(lambda **_: json_response(envelope)),
+        linked_service=linked_service(lambda **_: response),
         settings=HttpDatasetSettings(
             url="https://example.test/orders",
             read=HttpReadSettings(
@@ -569,18 +576,50 @@ def test_paginate_deserializer_materializes_envelope_records() -> None:
                 ),
             ),
         ),
-        deserializer=PandasDeserializer(
-            format=DatasetStorageFormatType.SEMI_STRUCTURED_JSON,
-            kwargs={"record_path": "data"},
-        ),
+        deserializer=deserialize,
     )
     dataset.read()
+    assert seen == [response.content]
     assert list(dataset.output["id"]) == [1, 2]
+
+
+def test_paginate_requires_deserializer() -> None:
+    """A paginated read fails before any request when no deserializer is set."""
+
+    def fake_request(**kwargs: Any) -> Any:
+        raise AssertionError("request should not be issued")
+
+    dataset = HttpDataset(
+        id=uuid.uuid4(),
+        name="ds",
+        version="1.0.0",
+        linked_service=linked_service(fake_request),
+        settings=HttpDatasetSettings(
+            url="https://example.test/orders",
+            read=HttpReadSettings(
+                pagination=PaginationSettings(
+                    strategy=PaginationStrategy.OFFSET,
+                    items_path="data",
+                    offset=OffsetPaginationSettings(page_size=10),
+                ),
+            ),
+        ),
+        deserializer=None,
+    )
+    with pytest.raises(ReadError, match=r"requires dataset\.deserializer"):
+        dataset.read()
+    assert dataset.output.empty is True
 
 
 @pytest.mark.parametrize("items_path", ["$", "data"])
 def test_paginate_empty_body_skips_deserializer(items_path: str) -> None:
-    """Empty per-page payload is an empty frame; deserializer is not invoked."""
+    """An empty page body is an empty frame; the deserializer is not called."""
+    seen: list[Any] = []
+
+    def deserialize(value: Any) -> pd.DataFrame:
+        seen.append(value)
+        return pd.DataFrame(value)
+
     dataset = HttpDataset(
         id=uuid.uuid4(),
         name="ds",
@@ -596,9 +635,10 @@ def test_paginate_empty_body_skips_deserializer(items_path: str) -> None:
                 ),
             ),
         ),
-        deserializer=PandasDeserializer(format=DatasetStorageFormatType.JSON),
+        deserializer=deserialize,
     )
     dataset.read()
+    assert seen == []
     assert dataset.output.empty is True
     assert "pagination" not in dataset.checkpoint
 

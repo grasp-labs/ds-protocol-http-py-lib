@@ -138,11 +138,21 @@ class Paginate:
         Appends page frames to ``frames`` (created if omitted) so callers retain
         partial output when this method raises mid-drain.
 
+        Each frame is ``dataset.deserializer(response.content)`` — the API body
+        the caller configured the deserializer for. ``items_path`` is paging
+        control only. An empty body is an empty frame and does not call the
+        deserializer.
+
         Raises:
+            ValueError: If ``dataset.deserializer`` is missing.
             ReadError: If ``max_pages`` is exceeded without a natural stop.
         """
         if frames is None:
             frames = []
+
+        deserializer = dataset.deserializer
+        if deserializer is None:
+            raise ValueError("Paginate requires dataset.deserializer")
 
         pagination = self.pagination
         strategy = self.strategy
@@ -162,10 +172,10 @@ class Paginate:
             )
             body = parse_json(response.content)
             items = get_list(body, pagination.items_path)
-            if dataset.deserializer is not None and response.content:
-                frames.append(dataset.deserializer(response.content))
+            if response.content:
+                frames.append(deserializer(response.content))
             else:
-                frames.append(pd.DataFrame(items))
+                frames.append(pd.DataFrame())
 
             if strategy.should_stop(
                 body=body,

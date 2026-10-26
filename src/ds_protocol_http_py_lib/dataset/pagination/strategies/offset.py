@@ -15,8 +15,8 @@ When to use (arbitrary API)
     offsets (``?page=2&per_page=50``).
 
 Intent
-    Client-derived windows over a list. Stop on a short/empty page, or when
-    ``offset + limit >= total`` if ``total_path`` is set.
+    Client-derived windows over a list. When ``total_path`` resolves, stop
+    when ``offset + limit >= total``. Otherwise stop on a short or empty page.
 
 Boundaries
     Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
@@ -111,13 +111,12 @@ class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSetting
         cfg: OffsetPaginationSettings,
     ) -> bool:
         del headers
-        limit = state.values.get("limit", cfg.page_size)
-        if is_short_or_empty_page(items, limit):
-            return True
-        if cfg.total_path is None:
-            return False
-        total = get_path(body, cfg.total_path)
-        return total is not None and state.values["offset"] + limit >= int(total)
+        limit = int(state.values.get("limit", cfg.page_size))
+        if cfg.total_path is not None:
+            total = get_path(body, cfg.total_path)
+            if total is not None:
+                return int(state.values["offset"]) + limit >= int(total)
+        return is_short_or_empty_page(items, limit)
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:
         return {

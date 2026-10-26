@@ -83,6 +83,40 @@ def test_commit_formats_timestamp_as_full_isoformat() -> None:
     assert checkpoint["incremental"]["watermark"] == "2024-03-01T15:30:00"
 
 
+def test_commit_excludes_pandas_missing_scalars_from_max() -> None:
+    """NaN, NaT, and pd.NA are dropped before the high-watermark is computed."""
+    settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")
+
+    numeric = pd.DataFrame({"updated_at": [float("nan"), 3.0, 9.0]})
+    checkpoint: dict = {}
+    commit(checkpoint, numeric, settings)
+    assert checkpoint["incremental"]["watermark"] == 9.0
+
+    timestamps = pd.DataFrame(
+        {"updated_at": [pd.NaT, pd.Timestamp("2024-05-01"), pd.Timestamp("2024-05-03")]},
+    )
+    checkpoint = {}
+    commit(checkpoint, timestamps, settings)
+    assert checkpoint["incremental"]["watermark"] == "2024-05-03T00:00:00"
+
+    nullable = pd.DataFrame({"updated_at": pd.Series([pd.NA, 4, 7], dtype="Int64")})
+    checkpoint = {}
+    commit(checkpoint, nullable, settings)
+    assert checkpoint["incremental"]["watermark"] == 7
+
+
+def test_commit_skips_when_every_watermark_scalar_is_missing() -> None:
+    """A frame of only missing watermark scalars does not persist a watermark."""
+    settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")
+    output = pd.DataFrame({"updated_at": [float("nan"), pd.NaT]})
+    checkpoint: dict = {"pagination": {"offset": 1}}
+
+    WatermarkRules().commit(checkpoint, output, settings)
+
+    assert "incremental" not in checkpoint
+    assert checkpoint["pagination"] == {"offset": 1}
+
+
 def test_commit_stores_non_timestamp_watermark_as_is() -> None:
     """Non-Timestamp max values are written to the checkpoint unchanged."""
     settings = IncrementalSettings(param="updated_since", watermark_path="updated_at")

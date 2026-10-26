@@ -46,7 +46,12 @@ class OffsetPaginationSettings(Serializable):
     """Offset used for the first page when no checkpoint exists."""
 
     total_path: str | None = None
-    """Optional body path to a total record count used for termination."""
+    """
+    Optional body path to a total record count.
+
+    When the path resolves, it decides termination (``offset + limit >= total``).
+    A short page ends the read only when this path is unset or missing.
+    """
 
     inject_location: InjectLocation = InjectLocation.QUERY
     """Where offset and limit are injected on the request."""
@@ -69,7 +74,12 @@ class PageNumberPaginationSettings(Serializable):
     """First page ordinal (0- or 1-based, must match the API)."""
 
     total_pages_path: str | None = None
-    """Optional body path to a total page count used for termination."""
+    """
+    Optional body path to a total page count.
+
+    When the path resolves, it decides termination. A short page ends the read
+    only when this path is unset or missing.
+    """
 
     inject_location: InjectLocation = InjectLocation.QUERY
     """Where page and page size are injected on the request."""
@@ -123,8 +133,9 @@ class PaginationSettings(Serializable):
     items_path: str = "data"
     """
     Path to the record array used for paging control (stop / advance).
-    Use ``$`` for a root array. Does not control how the page body is
-    materialized — that is ``dataset.deserializer(response.content)``.
+
+    Use ``$`` for a root array. Does not select what the deserializer sees.
+    Each page frame is ``dataset.deserializer(response.content)``.
     """
 
     offset: OffsetPaginationSettings | None = None

@@ -30,7 +30,8 @@ class WatermarkRules(IncrementalRules):
     Resume on a caller-persisted high-watermark.
 
     Reads ``checkpoint["incremental"]["watermark"]`` on prepare. On commit,
-    advances it to the max value at ``settings.watermark_path`` across rows.
+    advances it to the max present value at ``settings.watermark_path`` across
+    rows. Pandas-missing scalars (``NaN``, ``NaT``, ``NA``) are ignored.
     Does not clear pagination state — Paginate owns that.
     """
 
@@ -65,7 +66,7 @@ class WatermarkRules(IncrementalRules):
         values = [
             value
             for record in output.to_dict(orient="records")
-            if (value := get_path(record, settings.watermark_path)) is not None
+            if not self._is_missing_scalar(value := get_path(record, settings.watermark_path))
         ]
         if not values:
             return
@@ -82,3 +83,8 @@ class WatermarkRules(IncrementalRules):
             watermark = watermark.isoformat()
 
         checkpoint[_CHECKPOINT_KEY] = {_WATERMARK_KEY: watermark}
+
+    @staticmethod
+    def _is_missing_scalar(value: Any) -> bool:
+        """True for ``None`` and pandas-missing scalars (``NaN``, ``NaT``, ``NA``)."""
+        return bool(pd.api.types.is_scalar(value) and pd.isna(value))

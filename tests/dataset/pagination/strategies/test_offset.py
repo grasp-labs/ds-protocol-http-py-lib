@@ -26,7 +26,7 @@ def _base_request() -> RequestSnapshot:
 
 
 def test_offset_inject_advance_stop_and_checkpoint() -> None:
-    """Offset injects params, advances by limit, stops on short page, round-trips checkpoint."""
+    """Offset injects params, advances by limit, stops when the window covers total, round-trips checkpoint."""
     settings = PaginationSettings(
         strategy=PaginationStrategy.OFFSET,
         items_path="data",
@@ -64,12 +64,57 @@ def test_offset_inject_advance_stop_and_checkpoint() -> None:
     restored = strategy.from_checkpoint(ck)
     assert restored.values["offset"] == 2
 
-    short = {"data": [{"id": 3}], "meta": {"total": 5}}
+    covered = {"data": [{"id": 3}], "meta": {"total": 4}}
     assert strategy.should_stop(
+        body=covered,
+        headers={},
+        items=covered["data"],
+        state=nxt,
+        cfg=cfg,
+    )
+
+
+def test_offset_short_page_continues_while_total_remains() -> None:
+    """A short page must not stop the read while offset + limit is still below total.
+
+    Stopping on length here drops the remaining rows. The same short page stops
+    once the window covers total, and when the total path is missing.
+    """
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.OFFSET,
+        offset=OffsetPaginationSettings(page_size=2, total_path="meta.total"),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.OFFSET)
+    state = strategy.initial_state(cfg, None)
+    state.values["offset"] = 2
+
+    short = {"data": [{"id": 3}], "meta": {"total": 5}}
+    assert not strategy.should_stop(
         body=short,
         headers={},
         items=short["data"],
-        state=nxt,
+        state=state,
+        cfg=cfg,
+    )
+
+    covered = {"data": [{"id": 5}], "meta": {"total": 5}}
+    state.values["offset"] = 4
+    assert strategy.should_stop(
+        body=covered,
+        headers={},
+        items=covered["data"],
+        state=state,
+        cfg=cfg,
+    )
+
+    missing_total = {"data": [{"id": 3}]}
+    state.values["offset"] = 2
+    assert strategy.should_stop(
+        body=missing_total,
+        headers={},
+        items=missing_total["data"],
+        state=state,
         cfg=cfg,
     )
 

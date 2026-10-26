@@ -91,6 +91,52 @@ def test_page_number_total_pages_respects_start_page() -> None:
     assert _walk(0) == [(0, False), (1, False), (2, True)]
 
 
+def test_page_number_short_page_continues_while_pages_remain() -> None:
+    """A short page must not stop the read before the last page in total_pages_path.
+
+    Stopping on length here drops later pages. The same short page stops on the
+    last ordinal, and when the total-pages path is missing.
+    """
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.PAGE_NUMBER,
+        page_number=PageNumberPaginationSettings(
+            page_size=20,
+            start_page=1,
+            total_pages_path="info.pages",
+        ),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.PAGE_NUMBER)
+    state = strategy.initial_state(cfg, None)
+    short = [{"id": 1}]
+
+    assert not strategy.should_stop(
+        body={"results": short, "info": {"pages": 3}},
+        headers={},
+        items=short,
+        state=state,
+        cfg=cfg,
+    )
+
+    state.values["page"] = 3
+    assert strategy.should_stop(
+        body={"results": short, "info": {"pages": 3}},
+        headers={},
+        items=short,
+        state=state,
+        cfg=cfg,
+    )
+
+    state.values["page"] = 1
+    assert strategy.should_stop(
+        body={"results": short},
+        headers={},
+        items=short,
+        state=state,
+        cfg=cfg,
+    )
+
+
 def test_page_number_advance_preserves_checkpoint_page_size() -> None:
     """Resume must keep checkpoint page_size; cfg.page_size must not replace it after advance."""
     settings = PaginationSettings(
