@@ -7,7 +7,8 @@ Offset / limit page strategy.
 When to use (arbitrary API)
     Pick this if the API asks for a **numeric skip** into the list, e.g.
     ``?offset=0&limit=100``, ``?skip=200&take=50``, ``from=100&size=100``.
-    You (the client) compute the next window: ``offset += limit``.
+    You (the client) compute the next window from the rows returned:
+    ``offset += len(items)``. The next request still asks for ``page_size``.
 
     Prefer **cursor** instead when the same API also offers a next-token —
     offsets break under inserts/deletes between pages (skipped / duplicated
@@ -15,8 +16,9 @@ When to use (arbitrary API)
     offsets (``?page=2&per_page=50``).
 
 Intent
-    Client-derived windows over a list. When ``total_path`` resolves, stop
-    when ``offset + limit >= total``. Otherwise stop on a short or empty page.
+    Client-derived windows over a list. An empty page stops. When
+    ``total_path`` resolves, a non-empty page stops once
+    ``offset + len(items) >= total``. Otherwise a short page stops.
 
 Boundaries
     Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
@@ -51,7 +53,7 @@ if TYPE_CHECKING:
 
 @register(PaginationStrategy.OFFSET)
 class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSettings]):
-    """Client-derived offset pagination: ``offset(n+1) = offset(n) + limit``."""
+    """Client-derived offset pagination: ``offset(n+1) = offset(n) + len(items)``."""
 
     def initial_state(
         self,
@@ -91,11 +93,11 @@ class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSetting
         state: PageState,
         cfg: OffsetPaginationSettings,
     ) -> PageState:
-        del body, headers, items
+        del body, headers
         limit = state.values.get("limit", cfg.page_size)
         return PageState(
             values={
-                "offset": state.values["offset"] + limit,
+                "offset": int(state.values["offset"]) + len(items),
                 "limit": limit,
             },
             page_index=state.page_index + 1,
@@ -111,11 +113,13 @@ class OffsetPaginationStrategy(PaginationStrategyHandler[OffsetPaginationSetting
         cfg: OffsetPaginationSettings,
     ) -> bool:
         del headers
-        limit = int(state.values.get("limit", cfg.page_size))
+        if not items:
+            return True
         if cfg.total_path is not None:
             total = get_path(body, cfg.total_path)
             if total is not None:
-                return int(state.values["offset"]) + limit >= int(total)
+                return int(state.values["offset"]) + len(items) >= int(total)
+        limit = int(state.values.get("limit", cfg.page_size))
         return is_short_or_empty_page(items, limit)
 
     def to_checkpoint(self, state: PageState) -> dict[str, Any]:

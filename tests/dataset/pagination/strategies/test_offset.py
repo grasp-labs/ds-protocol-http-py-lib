@@ -26,7 +26,7 @@ def _base_request() -> RequestSnapshot:
 
 
 def test_offset_inject_advance_stop_and_checkpoint() -> None:
-    """Offset injects params, advances by limit, stops when the window covers total, round-trips checkpoint."""
+    """Offset injects params, advances by the rows returned, stops when they cover total, round-trips checkpoint."""
     settings = PaginationSettings(
         strategy=PaginationStrategy.OFFSET,
         items_path="data",
@@ -64,21 +64,38 @@ def test_offset_inject_advance_stop_and_checkpoint() -> None:
     restored = strategy.from_checkpoint(ck)
     assert restored.values["offset"] == 2
 
-    covered = {"data": [{"id": 3}], "meta": {"total": 4}}
+    one = {"data": [{"id": 3}], "meta": {"total": 4}}
+    assert not strategy.should_stop(
+        body=one,
+        headers={},
+        items=one["data"],
+        state=nxt,
+        cfg=cfg,
+    )
+    last = strategy.advance(
+        body=one,
+        headers={},
+        items=one["data"],
+        state=nxt,
+        cfg=cfg,
+    )
+    assert last.values == {"offset": 3, "limit": 2}
+    covered = {"data": [{"id": 4}], "meta": {"total": 4}}
     assert strategy.should_stop(
         body=covered,
         headers={},
         items=covered["data"],
-        state=nxt,
+        state=last,
         cfg=cfg,
     )
 
 
 def test_offset_short_page_continues_while_total_remains() -> None:
-    """A short page must not stop the read while offset + limit is still below total.
+    """A short page continues while the rows received have not covered total.
 
+    The next offset moves by those rows and the requested limit stays put.
     Stopping on length here drops the remaining rows. The same short page stops
-    once the window covers total, and when the total path is missing.
+    once the rows cover total, and when the total path is missing.
     """
     settings = PaginationSettings(
         strategy=PaginationStrategy.OFFSET,
@@ -97,6 +114,14 @@ def test_offset_short_page_continues_while_total_remains() -> None:
         state=state,
         cfg=cfg,
     )
+    stepped = strategy.advance(
+        body=short,
+        headers={},
+        items=short["data"],
+        state=state,
+        cfg=cfg,
+    )
+    assert stepped.values == {"offset": 3, "limit": 2}
 
     covered = {"data": [{"id": 5}], "meta": {"total": 5}}
     state.values["offset"] = 4
@@ -114,6 +139,25 @@ def test_offset_short_page_continues_while_total_remains() -> None:
         body=missing_total,
         headers={},
         items=missing_total["data"],
+        state=state,
+        cfg=cfg,
+    )
+
+
+def test_offset_empty_page_stops_while_total_remains() -> None:
+    """An empty page stops even when total says more rows exist."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.OFFSET,
+        offset=OffsetPaginationSettings(page_size=100, total_path="meta.total"),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.OFFSET)
+    state = strategy.initial_state(cfg, None)
+
+    assert strategy.should_stop(
+        body={"data": [], "meta": {"total": 10000}},
+        headers={},
+        items=[],
         state=state,
         cfg=cfg,
     )
@@ -160,8 +204,46 @@ def test_offset_advance_preserves_checkpoint_limit() -> None:
     )
 
 
+def test_offset_capped_page_steps_through_every_row() -> None:
+    """A server cap below page_size steps by the rows returned.
+
+    Requested limit stays 100. Each page returns 50 rows of a 200-row result.
+    The read visits offsets 0, 50, 100, and 150, then stops. It does not jump
+    to 100 after the first page, and it does not stop at offset 100 while
+    rows 150-199 are still outstanding.
+    """
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.OFFSET,
+        offset=OffsetPaginationSettings(page_size=100, total_path="meta.total"),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.OFFSET)
+    state = strategy.initial_state(cfg, None)
+    offsets: list[int] = []
+    seen: list[int] = []
+    for _ in range(5):
+        offset = int(state.values["offset"])
+        offsets.append(offset)
+        count = min(50, 200 - offset)
+        items = [{"id": i} for i in range(offset, offset + count)]
+        body = {"data": items, "meta": {"total": 200}}
+        if strategy.should_stop(body=body, headers={}, items=items, state=state, cfg=cfg):
+            seen.extend(item["id"] for item in items)
+            break
+        seen.extend(item["id"] for item in items)
+        state = strategy.advance(body=body, headers={}, items=items, state=state, cfg=cfg)
+        assert state.values["limit"] == 100
+        injected = strategy.inject(_base_request(), state, cfg)
+        assert injected.params["limit"] == 100
+    else:
+        raise AssertionError(f"offset walk did not stop: {offsets}")
+
+    assert offsets == [0, 50, 100, 150]
+    assert seen == list(range(200))
+
+
 def test_offset_stops_when_total_reached() -> None:
-    """Offset terminates when offset + limit covers total."""
+    """Offset terminates when the rows received cover total."""
     settings = PaginationSettings(
         strategy=PaginationStrategy.OFFSET,
         offset=OffsetPaginationSettings(page_size=50, total_path="meta.total"),

@@ -49,8 +49,11 @@ class OffsetPaginationSettings(Serializable):
     """
     Optional body path to a total record count.
 
-    When the path resolves, it decides termination (``offset + limit >= total``).
-    A short page ends the read only when this path is unset or missing.
+    When the path resolves, a non-empty page stops once
+    ``offset + len(items) >= total``. The next offset advances by the rows
+    returned, and the request still asks for ``page_size``. An empty page
+    stops immediately. A short page ends the read only when this path is
+    unset or missing.
     """
 
     inject_location: InjectLocation = InjectLocation.QUERY
@@ -77,8 +80,9 @@ class PageNumberPaginationSettings(Serializable):
     """
     Optional body path to a total page count.
 
-    When the path resolves, it decides termination. A short page ends the read
-    only when this path is unset or missing.
+    When the path resolves, a non-empty page stops on the last ordinal. An
+    empty page stops immediately. A short page ends the read only when this
+    path is unset or missing.
     """
 
     inject_location: InjectLocation = InjectLocation.QUERY

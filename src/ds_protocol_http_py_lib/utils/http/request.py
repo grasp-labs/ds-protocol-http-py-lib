@@ -49,7 +49,12 @@ class RequestSnapshot:
         )
 
     def inject(self, name: str, value: Any, location: InjectLocation) -> RequestSnapshot:
-        """Return a clone with ``value`` written at ``location`` under ``name``."""
+        """
+        Return a clone with ``value`` written at ``location`` under ``name``.
+
+        ``BODY`` writes ``data`` when that field is non-empty, because
+        ``requests`` ignores ``json`` in that case. Otherwise it writes ``json``.
+        """
         out = self.clone()
         if location is InjectLocation.QUERY:
             params = dict(out.params or {})
@@ -61,12 +66,24 @@ class RequestSnapshot:
             headers[name] = value
             out.headers = headers
             return out
-        if location is InjectLocation.BODY:
-            body = dict(out.json or {})
+        return self._inject_body(out, name, value)
+
+    @staticmethod
+    def _inject_body(out: RequestSnapshot, name: str, value: Any) -> RequestSnapshot:
+        """Write ``name`` onto the body field ``requests`` will send."""
+        if out.data:
+            if not isinstance(out.data, dict):
+                raise ValueError(
+                    f"BODY injection requires data to be a dict (got {type(out.data).__name__})",
+                )
+            body = dict(out.data)
             body[name] = value
-            out.json = body
+            out.data = body
             return out
-        raise ValueError(f"Unsupported inject location: {location}")
+        json_body = dict(out.json or {})
+        json_body[name] = value
+        out.json = json_body
+        return out
 
     def to_request_kwargs(self) -> dict[str, Any]:
         """Keyword arguments for ``connection.request``."""

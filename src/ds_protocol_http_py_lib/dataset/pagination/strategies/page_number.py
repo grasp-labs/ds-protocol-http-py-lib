@@ -14,10 +14,10 @@ When to use (arbitrary API)
     inserted/deleted between requests.
 
 Intent
-    Client-derived page ordinals. When ``total_pages_path`` resolves, stop
-    when ``page >= start_page + total_pages - 1`` (``total_pages`` is a count,
-    so the last ordinal depends on ``start_page``). Otherwise stop on a short
-    or empty page.
+    Client-derived page ordinals. An empty page stops. When
+    ``total_pages_path`` resolves, a non-empty page stops once
+    ``page >= start_page + total_pages - 1`` (``total_pages`` is a count, so
+    the last ordinal depends on ``start_page``). Otherwise a short page stops.
 
 Boundaries
     Owns page params, stop logic, and mid-run ``checkpoint["pagination"]``
@@ -113,6 +113,8 @@ class PageNumberPaginationStrategy(PaginationStrategyHandler[PageNumberPaginatio
         cfg: PageNumberPaginationSettings,
     ) -> bool:
         del headers
+        if not items:
+            return True
         if cfg.total_pages_path is not None:
             total_pages = get_path(body, cfg.total_pages_path)
             if total_pages is not None:

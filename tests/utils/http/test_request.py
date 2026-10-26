@@ -7,8 +7,6 @@ Unit tests for RequestSnapshot injection and header lookup.
 
 from __future__ import annotations
 
-from typing import Any, cast
-
 import pytest
 
 from ds_protocol_http_py_lib.enums import HttpMethod
@@ -41,17 +39,36 @@ def test_inject_header_and_body() -> None:
     assert request.json == {}
 
 
+def test_inject_body_writes_data_when_data_is_set() -> None:
+    """BODY follows the form body requests will send, and leaves json unchanged."""
+    request = RequestSnapshot(
+        url="https://api.example.com/items",
+        method=HttpMethod.POST,
+        data={"status": "open"},
+        json={"ignored": True},
+    )
+    bodied = request.inject("cursor", "tok-1", InjectLocation.BODY)
+    assert bodied.data == {"status": "open", "cursor": "tok-1"}
+    assert bodied.json == {"ignored": True}
+    assert request.data == {"status": "open"}
+
+
+def test_inject_body_rejects_non_dict_data() -> None:
+    """A raw data body cannot take an injected field."""
+    request = RequestSnapshot(
+        url="https://api.example.com/items",
+        method=HttpMethod.POST,
+        data="status=open",
+    )
+    with pytest.raises(ValueError, match="requires data to be a dict"):
+        request.inject("cursor", "tok-1", InjectLocation.BODY)
+
+
 def test_inject_when_containers_absent() -> None:
     """Injection initializes None containers on the clone."""
     bare = RequestSnapshot(url="https://api.example.com/items", method=HttpMethod.GET)
     assert bare.inject("X-A", "1", InjectLocation.HEADER).headers == {"X-A": "1"}
     assert bare.inject("offset", 0, InjectLocation.BODY).json == {"offset": 0}
-
-
-def test_inject_unsupported_location_raises() -> None:
-    """Unknown inject location raises ValueError."""
-    with pytest.raises(ValueError, match="Unsupported inject location"):
-        _base_request().inject("x", 1, cast("InjectLocation", cast("Any", "path")))
 
 
 def test_get_header_case_insensitive() -> None:

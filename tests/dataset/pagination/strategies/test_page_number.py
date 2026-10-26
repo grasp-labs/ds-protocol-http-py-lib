@@ -137,6 +137,29 @@ def test_page_number_short_page_continues_while_pages_remain() -> None:
     )
 
 
+def test_page_number_empty_page_stops_while_pages_remain() -> None:
+    """An empty page stops even when total_pages says later pages exist."""
+    settings = PaginationSettings(
+        strategy=PaginationStrategy.PAGE_NUMBER,
+        page_number=PageNumberPaginationSettings(
+            page_size=100,
+            start_page=1,
+            total_pages_path="total_pages",
+        ),
+    )
+    cfg = settings.strategy_config
+    strategy = get_strategy(PaginationStrategy.PAGE_NUMBER)
+    state = strategy.initial_state(cfg, None)
+
+    assert strategy.should_stop(
+        body={"results": [], "total_pages": 50},
+        headers={},
+        items=[],
+        state=state,
+        cfg=cfg,
+    )
+
+
 def test_page_number_advance_preserves_checkpoint_page_size() -> None:
     """Resume must keep checkpoint page_size; cfg.page_size must not replace it after advance."""
     settings = PaginationSettings(
