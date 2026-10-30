@@ -6,7 +6,7 @@ Centralized test doubles used across unit tests.
 
 Covers:
 - Provider-layer fakes (session/response, token bucket) for Http provider tests.
-- Dataset-layer fakes (linked service, client, serializer/deserializer) for HttpDataset tests.
+- Dataset-layer fakes (linked service, client) for HttpDataset tests.
 - Linked-service-layer fakes (Http-like client, JSON response, HTTPError factory) for auth/connection tests.
 """
 
@@ -16,7 +16,6 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-import pandas as pd
 from ds_resource_plugin_py_lib.common.resource.linked_service.errors import (
     ConnectionError as LinkedServiceConnectionError,
 )
@@ -173,40 +172,6 @@ class LinkedService:
 
     def close(self) -> None:
         self.closed = True
-
-
-class SerializerSpy:
-    """
-    Serializer spy used by HttpDataset tests.
-    """
-
-    def __init__(self) -> None:
-        self.called_with: Any | None = None
-
-    def __call__(self, value: Any) -> Any:
-        self.called_with = value
-        return b"serialized"
-
-
-class DeserializerStub:
-    """
-    Deserializer stub used by HttpDataset tests.
-    """
-
-    def __init__(self, *, next_value: bool = False, cursor_value: str | None = None) -> None:
-        self.next_value = next_value
-        self.cursor_value = cursor_value
-        self.called_with: bytes | None = None
-
-    def __call__(self, payload: bytes) -> pd.DataFrame:
-        self.called_with = payload
-        return pd.DataFrame([{"ok": 1}])
-
-    def get_next(self, payload: bytes) -> bool:
-        return self.next_value
-
-    def get_end_cursor(self, payload: bytes) -> str | None:
-        return self.cursor_value
 
 
 @dataclass(slots=True)

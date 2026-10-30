@@ -8,9 +8,11 @@ Example 02: Write a dataset over HTTP (POST) using ds-protocol-http-py-lib.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 
 import pandas as pd
+from dotenv import load_dotenv
 from ds_common_logger_py_lib import Logger
 from ds_resource_plugin_py_lib.common.resource.errors import ResourceException
 
@@ -21,6 +23,8 @@ from ds_protocol_http_py_lib.linked_service.http import (
     HttpLinkedService,
     HttpLinkedServiceSettings,
 )
+
+load_dotenv()
 
 Logger.configure(level=logging.DEBUG)
 logger = Logger.get_logger(__name__)
@@ -37,8 +41,8 @@ def main() -> pd.DataFrame:
             headers={"Content-Type": "application/json"},
             oauth2=OAuth2AuthSettings(
                 token_endpoint="http://example.com/oauth/token",
-                client_id="******",
-                client_secret="******",
+                client_id=os.environ["CLIENT_ID"],
+                client_secret=os.environ["CLIENT_SECRET"],
             ),
         ),
     )
